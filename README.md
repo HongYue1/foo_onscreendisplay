@@ -2,7 +2,6 @@
 
 <p align="center">
   A modern on-screen display for <a href="https://www.foobar2000.org/">foobar2000</a> v2.<br />
-  Cover art, title, artist, album and a progress bar on a card that slides in when the music changes.
 </p>
 
 <p align="center">
