@@ -15,8 +15,9 @@
   **Save** your own looks as presets; they sit in the same list and can be deleted again.
 - **Accent from the cover.** The artwork's most telling colour (picked in the perceptual OKLab space,
   so a small vivid patch beats a large dull area) drives the progress bar and outline, and is
-  adjusted to stay readable on the card without changing its hue. Greyscale covers get an off-white (dark card) or charcoal
-  (light card) accent instead of an arbitrary colour.
+  adjusted to stay readable on the card without changing its hue. Greyscale covers get an off-white
+  (dark card) or charcoal (light card) accent instead of an arbitrary colour.
+- **Crisp text.** Glyphs are hinted to whole pixels, and opaque cards use ClearType when Windows does.
 - **Your fonts.** Pick line 1 and lines 2-3 with the standard Windows font dialog (family, style, exact
   size). Unpicked fonts follow your Columns UI or Default UI font. Up to three **fallback fonts** cover
   characters the main font lacks (Cyrillic, CJK, symbols, emoji), on all lines.
@@ -71,10 +72,10 @@ resumed, and (if you turn it on) when you seek.
 | Tab | What is in it |
 | --- | --- |
 | General | When the card shows (track start, stream title, pause, seek); how long, keep visible while paused, wait for the cover, fade under the mouse pointer, only in the background, hide over full-screen apps; position (nine spots), monitor, margin, size (50-300%) |
-| Style | Preset; layout, background (dark, light, cover tint, cover colour, custom), opacity, border, corner radius; text colour, accent (or from the cover), animation and speed; shadow, glossy edge |
+| Style | Preset (save your own, delete them); layout, background (dark, light, cover tint, cover colour, custom), opacity, border, corner radius; text colour, accent (or from the cover), animation and speed; shadow, glossy edge |
 | Elements | Album art, play/pause icon, progress bar with knob, time labels and time left; art shape and bar style |
 | Text | The three track lines. **Help** opens foobar2000's title formatting reference; **Default** restores the three lines only |
-| Fonts | Line 1 font, lines 2-3 font, and three fallback fonts |
+| Fonts | Line 1 font, lines 2-3 font, sharper text (ClearType), and three fallback fonts |
 
 ### Track text
 
