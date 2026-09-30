@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/accent-from-cover.webp" alt="foo_osd card with a violet accent taken from the cover art" width="640" />
+  <img src="docs/images/accent-from-cover.png" alt="foo_osd card with a violet accent taken from the cover art" width="600" />
 </p>
 
 ## Features
@@ -37,12 +37,12 @@
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/images/glass.webp" alt="Translucent card" width="100%" /><br /><sub>Translucent card, paused</sub></td>
-    <td width="50%"><img src="docs/images/snow.webp" alt="Light card" width="100%" /><br /><sub>Light card</sub></td>
+    <td width="50%" align="center"><img src="docs/images/midnight.png" alt="Compact black card" width="100%" /><br /><sub><b>Midnight</b> - compact black card (default)</sub></td>
+    <td width="50%" align="center"><img src="docs/images/snow.png" alt="Light card" width="100%" /><br /><sub><b>Snow</b> - light card</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/images/amoled.webp" alt="Compact black card" width="100%" /><br /><sub>Compact black card</sub></td>
-    <td width="50%"><img src="docs/images/accent-from-cover.webp" alt="Dark card with a violet outline" width="100%" /><br /><sub>Accent colour from the cover</sub></td>
+    <td width="50%" align="center"><img src="docs/images/cover-colour.png" alt="Card in the cover's colour" width="100%" /><br /><sub><b>Cover colour</b> - the card takes the cover's colour</sub></td>
+    <td width="50%" align="center"><img src="docs/images/accent-from-cover.png" alt="Dark card with a violet outline and bar" width="100%" /><br /><sub>Accent from the cover: outline and bar</sub></td>
   </tr>
 </table>
 
