@@ -76,48 +76,50 @@ STYLE DS_SETFONT | DS_CONTROL | WS_CHILD
 FONT 8, "Microsoft Sans Serif", 400, 0, 0x0
 BEGIN
     LTEXT           "Preset:",IDC_STATIC,7,6,40,8
-    COMBOBOX        IDC_PRESET,50,4,130,200,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Sets the look only. Text, fonts and placement stay.",IDC_STATIC,186,2,107,16
+    COMBOBOX        IDC_PRESET,50,4,138,200,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Save...",IDC_PRESET_SAVE,192,3,48,14
+    PUSHBUTTON      "Delete",IDC_PRESET_DELETE,244,3,49,14
+    LTEXT           "Sets the look only: text, fonts, placement and behaviour stay.",IDC_STATIC,50,20,243,8
 
-    LTEXT           "Card",IDC_STATIC,7,28,140,8
-    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,38,140,1
-    LTEXT           "Layout:",IDC_STATIC,12,46,58,8
-    COMBOBOX        IDC_LAYOUT,73,44,74,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Background:",IDC_STATIC,12,62,58,8
-    COMBOBOX        IDC_BG_MODE,73,60,74,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Custom colour:",IDC_STATIC,12,78,58,8
-    EDITTEXT        IDC_BG_HEX,73,76,40,12,ES_AUTOHSCROLL | ES_UPPERCASE
-    CONTROL         "",IDC_BG_SWATCH,"Button",BS_OWNERDRAW | WS_TABSTOP,117,76,24,12
-    LTEXT           "Opacity:",IDC_STATIC,12,94,58,8
-    EDITTEXT        IDC_OPACITY,73,92,28,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "% (30-100)",IDC_STATIC,105,94,42,8
-    LTEXT           "Border:",IDC_STATIC,12,110,58,8
-    COMBOBOX        IDC_BORDER,73,108,74,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Corner radius:",IDC_STATIC,12,126,58,8
-    EDITTEXT        IDC_RADIUS,73,124,28,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "px",IDC_STATIC,105,126,42,8
+    LTEXT           "Card",IDC_STATIC,7,36,140,8
+    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,46,140,1
+    LTEXT           "Layout:",IDC_STATIC,12,54,58,8
+    COMBOBOX        IDC_LAYOUT,73,52,74,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Background:",IDC_STATIC,12,70,58,8
+    COMBOBOX        IDC_BG_MODE,73,68,74,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Custom colour:",IDC_STATIC,12,86,58,8
+    EDITTEXT        IDC_BG_HEX,73,84,40,12,ES_AUTOHSCROLL | ES_UPPERCASE
+    CONTROL         "",IDC_BG_SWATCH,"Button",BS_OWNERDRAW | WS_TABSTOP,117,84,24,12
+    LTEXT           "Opacity:",IDC_STATIC,12,102,58,8
+    EDITTEXT        IDC_OPACITY,73,100,28,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "% (30-100)",IDC_STATIC,105,102,42,8
+    LTEXT           "Border:",IDC_STATIC,12,118,58,8
+    COMBOBOX        IDC_BORDER,73,116,74,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Corner radius:",IDC_STATIC,12,134,58,8
+    EDITTEXT        IDC_RADIUS,73,132,28,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "px",IDC_STATIC,105,134,42,8
 
-    LTEXT           "Colours and motion",IDC_STATIC,155,28,138,8
-    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,155,38,138,1
-    LTEXT           "Text colour:",IDC_STATIC,160,46,52,8
-    COMBOBOX        IDC_TEXT_MODE,215,44,78,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Custom text:",IDC_STATIC,160,62,52,8
-    EDITTEXT        IDC_TEXT_HEX,215,60,40,12,ES_AUTOHSCROLL | ES_UPPERCASE
-    CONTROL         "",IDC_TEXT_SWATCH,"Button",BS_OWNERDRAW | WS_TABSTOP,259,60,24,12
-    LTEXT           "Accent:",IDC_STATIC,160,78,52,8
-    EDITTEXT        IDC_ACCENT_HEX,215,76,40,12,ES_AUTOHSCROLL | ES_UPPERCASE
-    CONTROL         "",IDC_ACCENT_SWATCH,"Button",BS_OWNERDRAW | WS_TABSTOP,259,76,24,12
-    CONTROL         "Accent from the cover art",IDC_ACCENT_COVER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,160,92,133,10
-    LTEXT           "Animation:",IDC_STATIC,160,110,52,8
-    COMBOBOX        IDC_ANIMATION,215,108,78,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Speed:",IDC_STATIC,160,126,52,8
-    EDITTEXT        IDC_ANIM_SPEED,215,124,28,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "% (40-300)",IDC_STATIC,247,126,46,8
+    LTEXT           "Colours and motion",IDC_STATIC,155,36,138,8
+    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,155,46,138,1
+    LTEXT           "Text colour:",IDC_STATIC,160,54,52,8
+    COMBOBOX        IDC_TEXT_MODE,215,52,78,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Custom text:",IDC_STATIC,160,70,52,8
+    EDITTEXT        IDC_TEXT_HEX,215,68,40,12,ES_AUTOHSCROLL | ES_UPPERCASE
+    CONTROL         "",IDC_TEXT_SWATCH,"Button",BS_OWNERDRAW | WS_TABSTOP,259,68,24,12
+    LTEXT           "Accent:",IDC_STATIC,160,86,52,8
+    EDITTEXT        IDC_ACCENT_HEX,215,84,40,12,ES_AUTOHSCROLL | ES_UPPERCASE
+    CONTROL         "",IDC_ACCENT_SWATCH,"Button",BS_OWNERDRAW | WS_TABSTOP,259,84,24,12
+    CONTROL         "Accent from the cover art",IDC_ACCENT_COVER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,160,100,133,10
+    LTEXT           "Animation:",IDC_STATIC,160,118,52,8
+    COMBOBOX        IDC_ANIMATION,215,116,78,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Speed:",IDC_STATIC,160,134,52,8
+    EDITTEXT        IDC_ANIM_SPEED,215,132,28,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "% (40-300)",IDC_STATIC,247,134,46,8
 
-    LTEXT           "Effects",IDC_STATIC,7,148,286,8
-    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,158,286,1
-    CONTROL         "Shadow",IDC_SHADOW,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,164,135,10
-    CONTROL         "Glossy top edge",IDC_SHEEN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,160,164,133,10
+    LTEXT           "Effects",IDC_STATIC,7,156,286,8
+    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,166,286,1
+    CONTROL         "Shadow",IDC_SHADOW,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,172,135,10
+    CONTROL         "Glossy top edge",IDC_SHEEN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,160,172,133,10
 END
 
 IDD_OSD_TAB_ELEMENTS DIALOGEX 0, 0, 300, 198
@@ -173,21 +175,34 @@ BEGIN
     LTEXT           "",IDC_DETAIL_FONT,85,41,108,10,SS_NOPREFIX | SS_ENDELLIPSIS
     PUSHBUTTON      "Select...",IDC_DETAIL_FONT_PICK,197,38,46,14
     PUSHBUTTON      "Default",IDC_DETAIL_FONT_CLEAR,247,38,46,14
-    LTEXT           "Default follows your Columns UI font, or the Default UI font. Line 1 is the title; lines 2-3 and the times use the second font. Picked sizes are exact.",IDC_STATIC,12,56,281,24
+    LTEXT           "Default follows your Columns UI font, or the Default UI font. Line 1 is the title; lines 2-3 and the times use the second font. Picked sizes are exact.",IDC_STATIC,12,56,281,16
+    CONTROL         "Sharper text: ClearType on opaque cards",IDC_CLEARTYPE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,76,281,10
 
-    LTEXT           "Fallback fonts",IDC_STATIC,7,92,286,8
-    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,102,286,1
-    LTEXT           "Fallback 1:",IDC_STATIC,12,111,70,8
-    LTEXT           "",IDC_FALLBACK_TEXT,85,111,108,10,SS_NOPREFIX | SS_ENDELLIPSIS
-    PUSHBUTTON      "Select...",IDC_FALLBACK_PICK,197,108,46,14
-    PUSHBUTTON      "Clear",IDC_FALLBACK_CLEAR,247,108,46,14
-    LTEXT           "Fallback 2:",IDC_STATIC,12,129,70,8
-    LTEXT           "",1081,85,129,108,10,SS_NOPREFIX | SS_ENDELLIPSIS
-    PUSHBUTTON      "Select...",1084,197,126,46,14
-    PUSHBUTTON      "Clear",1087,247,126,46,14
-    LTEXT           "Fallback 3:",IDC_STATIC,12,147,70,8
-    LTEXT           "",1082,85,147,108,10,SS_NOPREFIX | SS_ENDELLIPSIS
-    PUSHBUTTON      "Select...",1085,197,144,46,14
-    PUSHBUTTON      "Clear",1088,247,144,46,14
-    LTEXT           "Tried in this order for characters the fonts above cannot draw. Only the family is used: size, weight and italic follow the line being drawn. Built-in fallbacks for CJK, symbols and emoji come after these.",IDC_STATIC,12,162,281,24
+    LTEXT           "Fallback fonts",IDC_STATIC,7,98,286,8
+    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,108,286,1
+    LTEXT           "Fallback 1:",IDC_STATIC,12,117,70,8
+    LTEXT           "",IDC_FALLBACK_TEXT,85,117,108,10,SS_NOPREFIX | SS_ENDELLIPSIS
+    PUSHBUTTON      "Select...",IDC_FALLBACK_PICK,197,114,46,14
+    PUSHBUTTON      "Clear",IDC_FALLBACK_CLEAR,247,114,46,14
+    LTEXT           "Fallback 2:",IDC_STATIC,12,135,70,8
+    LTEXT           "",1081,85,135,108,10,SS_NOPREFIX | SS_ENDELLIPSIS
+    PUSHBUTTON      "Select...",1084,197,132,46,14
+    PUSHBUTTON      "Clear",1087,247,132,46,14
+    LTEXT           "Fallback 3:",IDC_STATIC,12,153,70,8
+    LTEXT           "",1082,85,153,108,10,SS_NOPREFIX | SS_ENDELLIPSIS
+    PUSHBUTTON      "Select...",1085,197,150,46,14
+    PUSHBUTTON      "Clear",1088,247,150,46,14
+    LTEXT           "Tried in this order for characters the fonts above cannot draw. Only the family is used: size, weight and italic follow the line being drawn. Built-in fallbacks for CJK, symbols and emoji come after these.",IDC_STATIC,12,168,281,24
+END
+
+IDD_OSD_PRESET_NAME DIALOGEX 0, 0, 220, 74
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Save preset"
+FONT 8, "Microsoft Sans Serif", 400, 0, 0x0
+BEGIN
+    LTEXT           "Name:",IDC_STATIC,7,10,30,8
+    EDITTEXT        IDC_PRESET_NAME,40,8,173,12,ES_AUTOHSCROLL
+    LTEXT           "Saves the look set on these pages. A preset of yours with the same name is replaced; built-in names are taken.",IDC_STATIC,40,26,173,24
+    DEFPUSHBUTTON   "Save",IDOK,109,53,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,163,53,50,14
 END

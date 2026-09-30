@@ -113,6 +113,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\artwork.h" />
+    <ClInclude Include="src\colour.h" />
     <ClInclude Include="src\config.h" />
     <ClInclude Include="src\controller.h" />
     <ClInclude Include="src\guids.h" />

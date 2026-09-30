@@ -116,6 +116,7 @@ private:
     void resolveColors();
     void computeLayout();
     void initFaces();
+    std::uint32_t textArgb(int alpha, std::uint32_t rgb) const;
     void ensureBuffers();
     void buildShadow();
     void renderStatic();
@@ -154,6 +155,7 @@ private:
     RECT m_work{};
     HWND m_anchor = nullptr;
     text::Faces m_faces[4]; // title, line 2, line 3, times
+    bool m_clearType = false; // text drawn with ClearType (opaque card), so brushes must be opaque too
 
     State m_state = State::Hidden;
     ULONGLONG m_stateStart = 0;

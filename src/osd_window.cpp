@@ -8,6 +8,7 @@
 #include <cstring>
 #include <memory>
 
+#include "colour.h"
 #include "osd_window.h"
 
 #pragma comment(lib, "gdiplus.lib")
@@ -66,47 +67,6 @@ float luminance(std::uint32_t c) {
     return (0.2126f * static_cast<float>((c >> 16) & 0xFF) + 0.7152f * static_cast<float>((c >> 8) & 0xFF) +
             0.0722f * static_cast<float>(c & 0xFF)) /
            255.f;
-}
-
-// Makes a colour taken from a cover usable as the accent on a dark or light card, the way
-// foo_mediabar does: hue kept, saturation floored and lightness windowed so it is never a muddy
-// smudge; a monochrome cover has no hue, so it becomes legible off-white (dark card) or charcoal.
-std::uint32_t accentForCard(std::uint32_t rgb, bool lightCard) {
-    const float r = static_cast<float>((rgb >> 16) & 0xFF) / 255.f, g = static_cast<float>((rgb >> 8) & 0xFF) / 255.f,
-                b = static_cast<float>(rgb & 0xFF) / 255.f;
-    const float mx = r > g ? (r > b ? r : b) : (g > b ? g : b);
-    const float mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
-    float l = (mx + mn) * 0.5f, s = 0.f, h = 0.f;
-    const float d = mx - mn;
-    if (d > 1e-6f) {
-        s = d / (1.f - std::fabs(2.f * l - 1.f));
-        if (mx == r) h = std::fmod((g - b) / d, 6.f);
-        else if (mx == g) h = (b - r) / d + 2.f;
-        else h = (r - g) / d + 4.f;
-        if (h < 0.f) h += 6.f;
-    }
-    if (s < 0.12f) {
-        s = 0.f;
-        l = lightCard ? (l < 0.22f ? l : 0.22f) : (l > 0.82f ? l : 0.82f);
-    } else {
-        if (s < 0.62f) s = 0.62f;
-        const float lo = lightCard ? 0.28f : 0.46f, hi = lightCard ? 0.42f : 0.62f;
-        l = l < lo ? lo : (l > hi ? hi : l);
-    }
-    const float c = (1.f - std::fabs(2.f * l - 1.f)) * s;
-    const float x = c * (1.f - std::fabs(std::fmod(h, 2.f) - 1.f));
-    const float m = l - c * 0.5f;
-    float pr = 0.f, pg = 0.f, pb = 0.f;
-    switch (static_cast<int>(h)) {
-    case 0: pr = c; pg = x; break;
-    case 1: pr = x; pg = c; break;
-    case 2: pg = c; pb = x; break;
-    case 3: pg = x; pb = c; break;
-    case 4: pr = x; pb = c; break;
-    default: pr = c; pb = x; break;
-    }
-    auto ch = [m](float v) { return static_cast<std::uint32_t>(roundi(clampf((v + m) * 255.f, 0.f, 255.f))) & 0xFF; };
-    return (ch(pr) << 16) | (ch(pg) << 8) | ch(pb);
 }
 
 void roundedPath(G::GraphicsPath& p, const G::RectF& r, float radius) {
@@ -492,7 +452,7 @@ void OsdWindow::resolveColors() {
         break;
     }
     c.lightBg = luminance(c.bg) > 0.58f;
-    if (fromCover) c.accent = accentForCard(c.accent, c.lightBg);
+    if (fromCover) c.accent = colour::accentForCard(c.accent, c.lightBg);
     c.text = m_s.textMode == TextCustom ? m_s.textColor : (c.lightBg ? 0x141418u : 0xFFFFFFu);
     c.fg = m_s.bgMode == BgCoverColour ? c.text : c.accent;
     if (c.lightBg && m_s.bgMode != BgCoverColour && luminance(c.fg) > 0.65f) c.fg = mixRgb(c.fg, 0x000000, 0.4f);
@@ -637,6 +597,23 @@ void OsdWindow::initFaces() {
     m_faces[1].init(m_s.detailFont, fb, m_l.fLine2, detailBold, m_s.detailItalic);
     m_faces[2].init(m_s.detailFont, fb, m_l.fLine3, detailBold, m_s.detailItalic);
     m_faces[3].init(m_s.detailFont, fb, m_l.fTime, detailBold, m_s.detailItalic);
+
+    // ClearType blends against what is under the glyph, so it is only right over an opaque card,
+    // and only wanted when the user has ClearType on in Windows.
+    BOOL smoothing = FALSE;
+    UINT type = 0;
+    const bool systemClearType = SystemParametersInfoW(SPI_GETFONTSMOOTHING, 0, &smoothing, 0) && smoothing &&
+                                 SystemParametersInfoW(SPI_GETFONTSMOOTHINGTYPE, 0, &type, 0) &&
+                                 type == FE_FONTSMOOTHINGCLEARTYPE;
+    m_clearType = m_s.clearType && m_s.opacity >= 100 && systemClearType;
+    for (auto& f : m_faces) f.setClearType(m_clearType);
+}
+
+// A text colour at some alpha. With ClearType the brush must be opaque, so the alpha is folded
+// into the colour against the card instead (the card is opaque then, so it looks the same).
+std::uint32_t OsdWindow::textArgb(int alpha, std::uint32_t rgb) const {
+    if (!m_clearType || alpha >= 255) return (static_cast<std::uint32_t>(alpha) << 24) | (rgb & 0xFFFFFFu);
+    return 0xFF000000u | mixRgb(m_col.bg, rgb, static_cast<float>(alpha) / 255.f);
 }
 
 void OsdWindow::ensureBuffers() {
@@ -843,15 +820,15 @@ void OsdWindow::renderStatic() {
     {
         const float glyphReserve = m_s.showGlyph ? l.glyphSize + 10.f * s : 0.f;
         if (l.hasRow1) {
-            G::SolidBrush b(argb(255, m_col.text));
+            G::SolidBrush b(G::Color(textArgb(255, m_col.text)));
             m_faces[0].draw(g, m_c.line1, l.textX, l.row1Y, l.textW - glyphReserve, l.rowH1, b);
         }
         if (l.hasRow2) {
-            G::SolidBrush b(argb(215, m_col.text));
+            G::SolidBrush b(G::Color(textArgb(215, m_col.text)));
             m_faces[1].draw(g, m_c.line2, l.textX, l.row2Y, l.textW, l.rowH2, b);
         }
         if (l.hasRow3) {
-            G::SolidBrush b(argb(150, m_col.text));
+            G::SolidBrush b(G::Color(textArgb(150, m_col.text)));
             m_faces[2].draw(g, m_c.line3, l.textX, l.row3Y, l.textW, l.rowH3, b);
         }
     }
@@ -884,7 +861,7 @@ void OsdWindow::drawProgress(double pos) {
     G::Graphics& g = *m_frameG;
     const float s = l.scale;
 
-    G::SolidBrush timeBrush(argb(170, m_col.text));
+    G::SolidBrush timeBrush(G::Color(textArgb(170, m_col.text)));
     if (m_s.showTimes) m_faces[3].draw(g, formatTime(pos), l.regionX, l.barRowY, l.timeW, l.barRowH, timeBrush, false);
     if (m_c.length <= 0.0) return; // a stream: elapsed time only
 

@@ -21,4 +21,7 @@ void prewarmFonts();
 // the data is not an image GDI+ understands.
 std::shared_ptr<const Artwork> decodeArtwork(const void* data, std::size_t size);
 
+//! Sets art.accent / art.hasAccent from the pixels (what decodeArtwork does). Exposed for tests.
+void pickAccent(Artwork& art);
+
 } // namespace osd

@@ -85,6 +85,9 @@ struct Settings {
     int detailPt = kDetailDefaultTenthsPt;
     int detailWeight = 0;
     bool detailItalic = false;
+    // ClearType (sub-pixel) text when the card is fully opaque and Windows uses ClearType; greyscale
+    // anti-aliasing otherwise. Not part of the look: presets leave it alone.
+    bool clearType = true;
 
     // Text (title formatting) and the fallback chain, kept across presets.
     std::string line1 = "$if2(%title%,%filename%)";
@@ -102,6 +105,8 @@ struct Settings {
     //! Back to the default look. Leaves behaviour, placement, elements that are not part of the
     //! look, text lines and fonts alone.
     void resetStyle();
+    //! Takes the look (what a preset sets) from another Settings and nothing else.
+    void copyLook(const Settings& from);
 
     std::string serialize() const;
     static Settings parse(const std::string& blob);

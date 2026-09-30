@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "../src/artwork.h"
+#include "../src/colour.h"
 #include "../src/config.h"
 #include "../src/osd_window.h"
 #include "../src/presets.h"
@@ -304,6 +305,32 @@ int wmain(int argc, wchar_t** argv) {
             }
         }
 
+        // ---- user presets: save, recognise, apply the look only, replace, delete ----------------
+        {
+            auto fail = [&](const char* what) {
+                std::printf("user presets: %s\n", what);
+                ++failures;
+            };
+            Settings look;
+            presets::apply(findPreset("Neon"), look);
+            look.accent = 0x123456;
+            look.cornerRadius = 7;
+            const int n0 = presets::count();
+            if (presets::saveUser("midnight", look) != -1 || presets::saveUser("Glass", look) != -1 || presets::saveUser("  ", look) != -1)
+                fail("a built-in or empty name was accepted");
+            const int idx = presets::saveUser("  Mine ", look);
+            if (idx != n0 || !presets::isUser(idx) || std::strcmp(presets::name(idx), "Mine") != 0) fail("not saved as \"Mine\" at the end");
+            Settings other;
+            other.position = MiddleCenter;
+            other.line1 = "x";
+            presets::apply(idx, other);
+            if (other.position != MiddleCenter || other.line1 != "x") fail("applying touched more than the look");
+            if (other.accent != 0x123456 || other.cornerRadius != 7 || presets::match(other) != idx) fail("look not restored or not recognised");
+            if (presets::saveUser("MINE", Settings{}) != idx || presets::count() != n0 + 1) fail("same name was not replaced");
+            if (presets::match(Settings{}) != 0 || !presets::matches(idx, Settings{})) fail("built-in should match first, user preset still matches");
+            if (!presets::removeUser(idx) || presets::count() != n0 || presets::isUser(idx)) fail("not removed");
+        }
+
         // ---- settings round trip, and the 1.0 followMonitor flag -----------------------------
         {
             Settings s;
@@ -325,6 +352,97 @@ int wmain(int argc, wchar_t** argv) {
                 std::printf("position not clamped\n");
                 ++failures;
             }
+        }
+
+        // ---- text sharpness: the Midnight card's text, greyscale then ClearType, 3x zoom ------
+        {
+            std::vector<Frame> crops;
+            for (bool ct : {false, true}) {
+                Settings s;
+                s.clearType = ct;
+                Frame f;
+                const std::uint32_t* px = win.debugRender(s, latin, 8.0, f.w, f.h);
+                if (!px) continue;
+                f.px.assign(px, px + static_cast<size_t>(f.w) * f.h);
+                // Text pixels over an opaque card must stay opaque, or the desktop shows through.
+                size_t holes = 0;
+                for (int y = f.h / 4; y < f.h * 3 / 4; ++y)
+                    for (int x = f.w / 3; x < f.w * 2 / 3; ++x)
+                        if ((f.px[static_cast<size_t>(y) * f.w + x] >> 24) != 255) ++holes;
+                std::printf("text %s: %zu non-opaque pixels inside the card\n", ct ? "ClearType" : "greyscale", holes);
+                if (holes) ++failures;
+                const int cx = 90, cy = 20, cw = 230, chh = 80, z = 3;
+                Frame c;
+                c.w = cw * z;
+                c.h = chh * z;
+                c.px.resize(static_cast<size_t>(c.w) * c.h);
+                for (int y = 0; y < c.h; ++y)
+                    for (int x = 0; x < c.w; ++x)
+                        c.px[static_cast<size_t>(y) * c.w + x] = f.px[static_cast<size_t>(cy + y / z) * f.w + cx + x / z] | 0xFF000000u;
+                crops.push_back(std::move(c));
+            }
+            grid(crops, 1, dir + L"\\text_zoom.jpg", 90);
+        }
+
+        // ---- accent from cover: synthetic covers, picked colour, and the card it gives ----------
+        {
+            struct Cover {
+                const char* name;
+                std::uint32_t (*px)(int x, int y);
+            };
+            const Cover covers[] = {
+                {"gradient checker", [](int x, int y) -> std::uint32_t {
+                     return (static_cast<std::uint32_t>(200 - y * 120 / 256) << 16) | (static_cast<std::uint32_t>(60 + x * 100 / 256) << 8) | (120u + ((x / 32 + y / 32) % 2) * 60u);
+                 }},
+                {"khaki + 12% blue", [](int x, int y) -> std::uint32_t {
+                     const int dx = x - 170, dy = y - 90;
+                     return dx * dx + dy * dy < 50 * 50 ? 0x2A7BF0u : (y > 200 ? 0x5C4A32u : 0xA89A6Eu);
+                 }},
+                {"greyscale", [](int x, int y) -> std::uint32_t {
+                     const std::uint32_t v = static_cast<std::uint32_t>(40 + (x + y) * 170 / 512);
+                     return (v << 16) | (v << 8) | v;
+                 }},
+                {"navy + 4% orange", [](int x, int y) -> std::uint32_t {
+                     return (x > 100 && x < 150 && y > 100 && y < 152) ? 0xF28A1Eu : 0x14203Au;
+                 }},
+                {"black + red stripe", [](int, int y) -> std::uint32_t { return (y > 120 && y < 146) ? 0xC81E24u : 0x0A0A0Cu; }},
+                {"pastel pink + white", [](int x, int) -> std::uint32_t { return x < 150 ? 0xF4C6D2u : 0xFAFAFAu; }},
+                {"yellow + black type", [](int x, int y) -> std::uint32_t {
+                     return (y > 180 && y < 210 && (x / 12) % 2) ? 0x111111u : 0xF2D21Bu;
+                 }},
+                {"teal / orange", [](int x, int y) -> std::uint32_t { return x + y < 256 ? 0x1F7A80u : 0xE0772Fu; }},
+                {"forest + skin", [](int x, int y) -> std::uint32_t {
+                     const int dx = x - 128, dy = y - 128;
+                     return dx * dx + dy * dy < 60 * 60 ? 0xD9A07Eu : ((x ^ y) & 8 ? 0x2E4A22u : 0x3F6130u);
+                 }},
+            };
+            std::vector<Frame> cards;
+            for (const Cover& cv : covers) {
+                auto a = std::make_shared<Artwork>();
+                a->w = a->h = Artwork::kSide;
+                a->px.resize(static_cast<size_t>(a->w) * a->h);
+                for (int y = 0; y < a->h; ++y)
+                    for (int x = 0; x < a->w; ++x) a->px[static_cast<size_t>(y) * a->w + x] = 0xFF000000u | cv.px(x, y);
+                const double t0 = nowMs();
+                pickAccent(*a);
+                const double t1 = nowMs();
+                std::printf("accent %-20s %s #%06X -> dark card #%06X, light card #%06X  (%.2f ms)\n", cv.name, a->hasAccent ? "yes" : "no ", a->accent,
+                            colour::accentForCard(a->accent, false), colour::accentForCard(a->accent, true), t1 - t0);
+                Content c = latin;
+                c.line1 = std::wstring(cv.name, cv.name + std::strlen(cv.name));
+                c.art = a;
+                for (const char* look : {"Midnight", "Snow"}) {
+                    Settings s;
+                    presets::apply(findPreset(look), s);
+                    s.accentFromCover = true;
+                    s.layout = LayoutCompact;
+                    Frame f;
+                    const std::uint32_t* px = win.debugRender(s, c, 200.0, f.w, f.h);
+                    if (px) f.px.assign(px, px + static_cast<size_t>(f.w) * f.h);
+                    cards.push_back(trim(f));
+                }
+            }
+            grid(cards, 4, dir + L"\\accents.jpg", 60, 0.6f);
         }
 
         // ---- all presets, trimmed, three to a row: presets.jpg ------------------------------

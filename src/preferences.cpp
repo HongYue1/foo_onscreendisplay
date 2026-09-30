@@ -230,6 +230,49 @@ bool pickFont(HWND owner, FontSel& f, int defaultTenths, int defaultWeight, bool
     return true;
 }
 
+//! "Save preset": asks for a name. Save stays disabled while the name is empty or a built-in's.
+class PresetNameDialog : public CDialogImpl<PresetNameDialog> {
+public:
+    enum { IDD = IDD_OSD_PRESET_NAME };
+
+    explicit PresetNameDialog(std::string initial) : m_name(std::move(initial)) {}
+    const std::string& name() const { return m_name; }
+
+    BEGIN_MSG_MAP_EX(PresetNameDialog)
+        MSG_WM_INITDIALOG(onInitDialog)
+        COMMAND_HANDLER_EX(IDC_PRESET_NAME, EN_CHANGE, onNameChanged)
+        COMMAND_ID_HANDLER_EX(IDOK, onOk)
+        COMMAND_ID_HANDLER_EX(IDCANCEL, onCancel)
+    END_MSG_MAP()
+
+private:
+    BOOL onInitDialog(CWindow, LPARAM) {
+        m_dark.AddDialogWithControls(*this);
+        CEdit edit(GetDlgItem(IDC_PRESET_NAME));
+        edit.LimitText(64);
+        edit.SetWindowTextW(pfc::stringcvt::string_wide_from_utf8(m_name.c_str()).get_ptr());
+        edit.SetSelAll();
+        edit.SetFocus();
+        update();
+        return FALSE; // focus set here
+    }
+    std::string typed() const {
+        wchar_t buf[128] = {};
+        ::GetDlgItemTextW(m_hWnd, IDC_PRESET_NAME, buf, static_cast<int>(std::size(buf)));
+        return std::string(pfc::stringcvt::string_utf8_from_wide(buf).get_ptr());
+    }
+    void update() { GetDlgItem(IDOK).EnableWindow(presets::validUserName(typed())); }
+    void onNameChanged(UINT, int, CWindow) { update(); }
+    void onOk(UINT, int, CWindow) {
+        m_name = typed();
+        if (presets::validUserName(m_name)) EndDialog(IDOK);
+    }
+    void onCancel(UINT, int, CWindow) { EndDialog(IDCANCEL); }
+
+    std::string m_name;
+    fb2k::CDarkModeHooks m_dark;
+};
+
 class PreferencesInstance : public CDialogImpl<PreferencesInstance>, public preferences_page_instance {
 public:
     explicit PreferencesInstance(preferences_page_callback::ptr callback) : m_callback(callback) {}
@@ -281,11 +324,7 @@ private:
         fill(IDC_ANIMATION, {L"Fade", L"Slide", L"Glide", L"None"});
         fill(IDC_BAR_STYLE, {L"Rounded", L"Thin", L"Thick"});
 
-        CComboBox preset(GetDlgItem(IDC_PRESET));
-        preset.AddString(L"Custom");
-        for (int i = 0; i < presets::count(); ++i) {
-            preset.AddString(pfc::stringcvt::string_wide_from_utf8(presets::name(i)).get_ptr());
-        }
+        fillPresets();
 
         // Title formatting fits comfortably in kTextMax; hex fields take "#RRGGBB".
         for (int id : {IDC_LINE1, IDC_LINE2, IDC_LINE3}) GetDlgItem(id).SendMessage(EM_LIMITTEXT, kTextMax - 1);
@@ -415,6 +454,14 @@ private:
             onPreset();
             return;
         }
+        if (id == IDC_PRESET_SAVE) {
+            onSavePreset();
+            return;
+        }
+        if (id == IDC_PRESET_DELETE) {
+            onDeletePreset();
+            return;
+        }
         if (onFontButton(id)) {
             showFonts();
             m_callback->on_state_changed();
@@ -429,17 +476,67 @@ private:
     void onPreset() {
         CComboBox box(GetDlgItem(IDC_PRESET));
         const int sel = box.GetCurSel();
-        if (sel <= 0) return;
+        if (sel <= 0) {
+            updatePresetButtons();
+            return;
+        }
         Settings s = fromDialog();
         presets::apply(sel - 1, s);
         toDialog(s);
         box.SetCurSel(sel);
+        updatePresetButtons();
         showPreview(s);
         m_callback->on_state_changed();
     }
 
+    //! "Custom", then every preset. Built-ins and the user's own share the list; a user preset is
+    //! told apart only by Delete being enabled.
+    void fillPresets() {
+        CComboBox box(GetDlgItem(IDC_PRESET));
+        box.ResetContent();
+        box.AddString(L"Custom");
+        for (int i = 0; i < presets::count(); ++i) box.AddString(pfc::stringcvt::string_wide_from_utf8(presets::name(i)).get_ptr());
+    }
+
+    int selectedPreset() { return CComboBox(GetDlgItem(IDC_PRESET)).GetCurSel() - 1; }
+
+    void updatePresetButtons() { GetDlgItem(IDC_PRESET_DELETE).EnableWindow(presets::isUser(selectedPreset())); }
+
+    //! Keeps the chosen preset while the look still is that preset (a user preset may equal a
+    //! built-in), otherwise shows the first match or "Custom".
     void syncPreset() {
+        const Settings s = fromDialog();
+        if (!presets::matches(selectedPreset(), s)) CComboBox(GetDlgItem(IDC_PRESET)).SetCurSel(presets::match(s) + 1);
+        updatePresetButtons();
+    }
+
+    //! Saved at once, not on Apply: a preset is not part of the settings being edited.
+    void onSavePreset() {
+        const int sel = selectedPreset();
+        std::string initial;
+        if (presets::isUser(sel)) {
+            initial = presets::name(sel);
+        } else {
+            for (int n = 1; initial.empty() || presets::find(initial) >= 0; ++n) initial = "My preset " + std::to_string(n);
+        }
+        PresetNameDialog dialog(initial);
+        if (dialog.DoModal(m_hWnd) != IDOK) return;
+        const int index = presets::saveUser(dialog.name(), fromDialog());
+        if (index < 0) return;
+        fillPresets();
+        CComboBox(GetDlgItem(IDC_PRESET)).SetCurSel(index + 1);
+        updatePresetButtons();
+    }
+
+    void onDeletePreset() {
+        const int sel = selectedPreset();
+        if (!presets::isUser(sel)) return;
+        const std::wstring question = L"Delete the preset \u201C" + std::wstring(pfc::stringcvt::string_wide_from_utf8(presets::name(sel)).get_ptr()) + L"\u201D?";
+        if (::MessageBoxW(m_hWnd, question.c_str(), L"On-screen display", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES) return;
+        presets::removeUser(sel);
+        fillPresets();
         CComboBox(GetDlgItem(IDC_PRESET)).SetCurSel(presets::match(fromDialog()) + 1);
+        updatePresetButtons();
     }
 
     // Returns true when id was a font Select/Default/Clear button (whether or not it changed anything).
@@ -650,6 +747,7 @@ private:
         s.showKnob = checked(IDC_SHOW_KNOB);
         s.shadow = checked(IDC_SHADOW);
         s.sheen = checked(IDC_SHEEN);
+        s.clearType = checked(IDC_CLEARTYPE);
         s.accentFromCover = checked(IDC_ACCENT_COVER);
 
         s.line1 = text(IDC_LINE1);
@@ -712,6 +810,7 @@ private:
         check(IDC_SHOW_KNOB, s.showKnob);
         check(IDC_SHADOW, s.shadow);
         check(IDC_SHEEN, s.sheen);
+        check(IDC_CLEARTYPE, s.clearType);
         check(IDC_ACCENT_COVER, s.accentFromCover);
 
         setText(IDC_LINE1, s.line1);

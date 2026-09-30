@@ -1,4 +1,16 @@
+// OSD_STANDALONE (the offline tests) keeps user presets in memory only.
+#ifndef OSD_STANDALONE
+#include <helpers/foobar2000+atl.h>
+#include <SDK/cfg_var.h>
+#endif
+
 #include "presets.h"
+
+#include <cstring>
+#include <string>
+#include <vector>
+
+#include "guids.h"
 
 namespace osd::presets {
 namespace {
@@ -289,32 +301,195 @@ const Preset kPresets[] = {
 
 constexpr int kCount = static_cast<int>(sizeof(kPresets) / sizeof(kPresets[0]));
 
+// ---- user presets ------------------------------------------------------------------------------
+// Stored as one text blob: each preset is a line "@name=<name>" followed by its look as
+// key=value lines (Settings::serialize, so unknown or missing keys behave like the main blob).
+
+struct User {
+    std::string name;
+    Settings look; // defaults everywhere but the look
+};
+
+#ifndef OSD_STANDALONE
+cfg_string c_users(guids::cfg_user_presets, "");
+#endif
+
+std::vector<User> g_users;
+bool g_loaded = false;
+
+constexpr size_t kMaxName = 64;
+
+char lowerAscii(char c) { return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c; }
+
+bool sameName(const std::string& a, const char* b) {
+    size_t i = 0;
+    for (; i < a.size() && b[i] != '\0'; ++i)
+        if (lowerAscii(a[i]) != lowerAscii(b[i])) return false;
+    return i == a.size() && b[i] == '\0';
+}
+
+// Control characters out (a name is one line), outer spaces trimmed, at most kMaxName bytes
+// without cutting a UTF-8 sequence.
+std::string cleanName(const std::string& raw) {
+    std::string s;
+    for (char c : raw) s.push_back(static_cast<unsigned char>(c) < 0x20 ? ' ' : c);
+    const size_t b = s.find_first_not_of(' ');
+    if (b == std::string::npos) return {};
+    s = s.substr(b, s.find_last_not_of(' ') - b + 1);
+    if (s.size() > kMaxName) {
+        size_t n = kMaxName;
+        while (n > 0 && (static_cast<unsigned char>(s[n]) & 0xC0) == 0x80) --n;
+        s.resize(n);
+        while (!s.empty() && s.back() == ' ') s.pop_back();
+    }
+    return s;
+}
+
+bool isBuiltinName(const std::string& n) {
+    for (int i = 0; i < kCount; ++i) {
+        // "Midnight (default)" is also taken as plain "Midnight".
+        const char* b = kPresets[i].name;
+        if (sameName(n, b)) return true;
+        const char* paren = std::strstr(b, " (");
+        if (paren != nullptr && sameName(n, std::string(b, paren).c_str())) return true;
+    }
+    return false;
+}
+
+void load() {
+    if (g_loaded) return;
+    g_loaded = true;
+#ifndef OSD_STANDALONE
+    const std::string blob = c_users.get().c_str();
+    std::string name, body;
+    auto flush = [&] {
+        name = cleanName(name);
+        if (name.empty() || isBuiltinName(name)) return;
+        for (const User& u : g_users)
+            if (sameName(u.name, name.c_str())) return;
+        User u;
+        u.name = name;
+        u.look.copyLook(Settings::parse(body));
+        g_users.push_back(std::move(u));
+    };
+    size_t pos = 0;
+    while (pos < blob.size()) {
+        size_t end = blob.find('\n', pos);
+        if (end == std::string::npos) end = blob.size();
+        const std::string line = blob.substr(pos, end - pos);
+        pos = end + 1;
+        if (line.compare(0, 6, "@name=") == 0) {
+            flush();
+            name = line.substr(6);
+            body.clear();
+        } else {
+            body.append(line).push_back('\n');
+        }
+    }
+    flush();
+#endif
+}
+
+void store() {
+#ifndef OSD_STANDALONE
+    std::string blob;
+    for (const User& u : g_users) blob.append("@name=").append(u.name).append("\n").append(u.look.serialize());
+    c_users = blob.c_str();
+#endif
+}
+
 } // namespace
 
-int count() { return kCount; }
+int builtinCount() { return kCount; }
 
-const char* name(int index) { return (index >= 0 && index < kCount) ? kPresets[index].name : ""; }
+int count() {
+    load();
+    return kCount + static_cast<int>(g_users.size());
+}
+
+bool isUser(int index) { return index >= kCount && index < count(); }
+
+const char* name(int index) {
+    if (index >= 0 && index < kCount) return kPresets[index].name;
+    return isUser(index) ? g_users[static_cast<size_t>(index - kCount)].name.c_str() : "";
+}
 
 void apply(int index, Settings& settings) {
-    if (index < 0 || index >= kCount) return;
-    settings.resetStyle();
-    if (kPresets[index].fn != nullptr) {
-        base(settings);
-        kPresets[index].fn(settings);
+    if (index >= 0 && index < kCount) {
+        settings.resetStyle();
+        if (kPresets[index].fn != nullptr) {
+            base(settings);
+            kPresets[index].fn(settings);
+        }
+    } else if (isUser(index)) {
+        settings.copyLook(g_users[static_cast<size_t>(index - kCount)].look);
+    } else {
+        return;
     }
     settings.clamp();
+}
+
+namespace {
+bool sameLook(int index, const Settings& clamped, const std::string& current) {
+    Settings candidate = clamped;
+    apply(index, candidate);
+    return candidate.serialize() == current;
+}
+} // namespace
+
+bool matches(int index, const Settings& settings) {
+    if (index < 0 || index >= count()) return false;
+    Settings clamped = settings;
+    clamped.clamp();
+    return sameLook(index, clamped, clamped.serialize());
 }
 
 int match(const Settings& settings) {
     Settings clamped = settings;
     clamped.clamp();
     const std::string current = clamped.serialize();
-    for (int i = 0; i < kCount; ++i) {
-        Settings candidate = clamped;
-        apply(i, candidate);
-        if (candidate.serialize() == current) return i;
-    }
+    for (int i = 0; i < count(); ++i)
+        if (sameLook(i, clamped, current)) return i;
     return -1;
+}
+
+int find(const std::string& rawName) {
+    const std::string n = cleanName(rawName);
+    if (n.empty()) return -1;
+    for (int i = 0; i < count(); ++i)
+        if (sameName(n, name(i))) return i;
+    return -1;
+}
+
+bool validUserName(const std::string& rawName) {
+    const std::string n = cleanName(rawName);
+    return !n.empty() && !isBuiltinName(n);
+}
+
+int saveUser(const std::string& rawName, const Settings& settings) {
+    const std::string n = cleanName(rawName);
+    if (n.empty() || isBuiltinName(n)) return -1;
+    load();
+    User u;
+    u.name = n;
+    u.look.copyLook(settings);
+    u.look.clamp();
+    int index = find(n);
+    if (isUser(index)) {
+        g_users[static_cast<size_t>(index - kCount)] = std::move(u);
+    } else {
+        g_users.push_back(std::move(u));
+        index = count() - 1;
+    }
+    store();
+    return index;
+}
+
+bool removeUser(int index) {
+    if (!isUser(index)) return false;
+    g_users.erase(g_users.begin() + (index - kCount));
+    store();
+    return true;
 }
 
 } // namespace osd::presets

@@ -5,10 +5,11 @@
 
 #include <algorithm>
 #include <cmath>
-#include <vector>
 #include <mutex>
+#include <vector>
 
 #include "artwork.h"
+#include "colour.h"
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "shlwapi.lib")
@@ -21,77 +22,130 @@ namespace {
 ULONG_PTR g_token = 0;
 std::mutex g_tokenMutex; // start/stop can race between the prewarm thread and the main thread
 
-// The cover's colour, chosen the way foo_mediabar does it: the most populous 16-level RGB bucket
-// (not a mean, which turns two opposite hues into grey), weighting vivid pixels by saturation^2
-// and the centre of the picture over its edges. Near-black and near-white pixels are ignored.
-// A monochrome cover has no vivid pixels, so a second pass answers with its dominant grey.
-// The result is the raw cover colour; the window makes it legible on the card (see
-// OsdWindow::resolveColors), which is what turns a grey cover into off-white or charcoal.
+float smoothstep(float e0, float e1, float x) {
+    const float t = std::clamp((x - e0) / (e1 - e0), 0.f, 1.f);
+    return t * t * (3.f - 2.f * t);
+}
+
+} // namespace
+
+// The cover's colour, in OKLab (see colour.h), in four steps:
+//  1. Every sampled pixel gets a weight: the centre of the picture counts more than its edges
+//     (borders, logos, barcodes), and near-black / near-white pixels count little.
+//  2. Colourful pixels (chroma above grey) are binned by hue, 36 bins of 10 degrees, weighted by
+//     how colourful they are and how usable their lightness is.
+//  3. Each hue (with its neighbours, so a hue on a bin edge is not split in two) is scored by
+//     population^0.7 x vividness. A large area wins, but a vivid area beats a larger dull one,
+//     which is what reads as a cover's "colour": the red title on a brown sleeve, not the brown.
+//  4. The winner is the weighted OKLab mean of its pixels: a real colour from the cover, not a
+//     bucket centre, and averaged in a space where averaging does not turn to mud.
+// A cover with almost no colourful pixels answers with its dominant grey. The result is the raw
+// cover colour; colour::accentForCard makes it legible on the card.
 void pickAccent(Artwork& art) {
     if (art.w <= 0 || art.h <= 0 || art.px.empty()) return;
-    constexpr int kLevels = 16;
-    constexpr int kBuckets = kLevels * kLevels * kLevels;
-    constexpr float kMinValue = 0.10f, kMaxValue = 0.97f, kMinSat = 0.12f, kCorner = 0.30f, kMinTotal = 8.f;
+    constexpr int kHues = 36;
+    constexpr int kGreys = 16;
+    constexpr float kCorner = 0.30f;    // weight of a corner pixel relative to the centre
+    constexpr float kMinColour = 0.02f; // share of colourful weight below which the cover is grey
+    constexpr float kPi = 3.14159265f;
+
+    static const auto kLinear = [] {
+        std::vector<float> t(256);
+        for (int i = 0; i < 256; ++i) t[static_cast<size_t>(i)] = colour::srgbToLinear(static_cast<float>(i) / 255.f);
+        return t;
+    }();
+
+    struct Bin {
+        double w = 0, L = 0, a = 0, b = 0, c = 0;
+    };
+    Bin hues[kHues];
+    Bin greys[kGreys];
+    double total = 0, colourful = 0;
 
     const size_t pixels = static_cast<size_t>(art.w) * static_cast<size_t>(art.h);
     const size_t step = pixels / 16384 > 1 ? pixels / 16384 : 1;
     const float halfW = static_cast<float>(art.w) * 0.5f, halfH = static_cast<float>(art.h) * 0.5f;
-
-    std::vector<float> weight(kBuckets, 0.f);
-    int best = -1;
-    for (int pass = 0; pass < 2 && best < 0; ++pass) {
-        const bool chroma = pass == 0;
-        if (!chroma) std::fill(weight.begin(), weight.end(), 0.f);
-        float total = 0.f;
-        for (size_t i = 0; i < pixels; i += step) {
-            const std::uint32_t p = art.px[i];
-            if ((p >> 24) < 250u) continue; // translucent = border or shadow, not the cover's colour
-            const int r = static_cast<int>((p >> 16) & 0xFF), g = static_cast<int>((p >> 8) & 0xFF), b = static_cast<int>(p & 0xFF);
-            const int mx = r > g ? (r > b ? r : b) : (g > b ? g : b);
-            const int mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
-            const float value = static_cast<float>(mx) / 255.f;
-            if (value < kMinValue || value > kMaxValue) continue;
-            const float sat = static_cast<float>(mx - mn) / static_cast<float>(mx);
-            if (chroma && sat < kMinSat) continue;
-            const float dx = (static_cast<float>(static_cast<size_t>(i) % static_cast<size_t>(art.w)) + 0.5f - halfW) / halfW;
-            const float dy = (static_cast<float>(static_cast<size_t>(i) / static_cast<size_t>(art.w)) + 0.5f - halfH) / halfH;
-            float radius = std::sqrt(dx * dx + dy * dy) * 0.70710678f;
-            if (radius > 1.f) radius = 1.f;
-            const float centre = 1.f - (1.f - kCorner) * radius * radius;
-            const float w = chroma ? sat * sat * centre : centre;
-            weight[static_cast<size_t>(((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4))] += w;
-            total += w;
-        }
-        if (chroma && total < kMinTotal) continue; // monochrome: try the grey pass
-        if (total <= 0.f) return;                 // nothing opaque at all
-        float bestW = 0.f;
-        for (int k = 0; k < kBuckets; ++k)
-            if (weight[static_cast<size_t>(k)] > bestW) {
-                bestW = weight[static_cast<size_t>(k)];
-                best = k;
-            }
-    }
-    if (best < 0) return;
-
-    // The real average of the winning bucket, not the centre of a 16-wide step.
-    double sr = 0, sg = 0, sb = 0, n = 0;
     for (size_t i = 0; i < pixels; i += step) {
         const std::uint32_t p = art.px[i];
-        if ((p >> 24) < 250u) continue;
-        const int r = static_cast<int>((p >> 16) & 0xFF), g = static_cast<int>((p >> 8) & 0xFF), b = static_cast<int>(p & 0xFF);
-        if (((r >> 4) << 8 | (g >> 4) << 4 | (b >> 4)) != best) continue;
-        sr += r;
-        sg += g;
-        sb += b;
-        n += 1.0;
+        if ((p >> 24) < 250u) continue; // translucent = border or shadow, not the cover's colour
+        const colour::Lab c = colour::linearToOklab(kLinear[(p >> 16) & 0xFF], kLinear[(p >> 8) & 0xFF], kLinear[p & 0xFF]);
+        const float dx = (static_cast<float>(i % static_cast<size_t>(art.w)) + 0.5f - halfW) / halfW;
+        const float dy = (static_cast<float>(i / static_cast<size_t>(art.w)) + 0.5f - halfH) / halfH;
+        const float radius = (std::min)(1.f, std::sqrt(dx * dx + dy * dy) * 0.70710678f);
+        float w = 1.f - (1.f - kCorner) * radius * radius;
+        // Near black and near white say little about a cover's colour.
+        w *= 0.15f + 0.85f * smoothstep(0.10f, 0.22f, c.L) * (1.f - smoothstep(0.93f, 0.99f, c.L));
+        total += w;
+
+        const float C = colour::chroma(c);
+        const float vivid = smoothstep(colour::kGreyChroma, 0.12f, C);
+        if (vivid > 0.f) {
+            colourful += w * vivid;
+            // Lightness where an accent can live; very dark or pale colours are only a last resort.
+            const float usable = 0.35f + 0.65f * smoothstep(0.22f, 0.40f, c.L) * (1.f - smoothstep(0.88f, 0.97f, c.L));
+            const double cw = static_cast<double>(w * vivid * usable);
+            float h = colour::hue(c);
+            if (h < 0.f) h += 2.f * kPi;
+            Bin& bin = hues[(std::min)(kHues - 1, static_cast<int>(h / (2.f * kPi) * kHues))];
+            bin.w += cw;
+            bin.L += cw * c.L;
+            bin.a += cw * c.a;
+            bin.b += cw * c.b;
+            bin.c += cw * C;
+        }
+        if (C < 0.06f) {
+            Bin& g = greys[(std::min)(kGreys - 1, static_cast<int>(c.L * kGreys))];
+            g.w += w;
+            g.L += w * c.L;
+        }
     }
-    if (n <= 0.0) return;
-    const auto ch = [n](double sum) { return static_cast<std::uint32_t>(sum / n + 0.5); };
-    art.accent = (ch(sr) << 16) | (ch(sg) << 8) | ch(sb);
+    if (total <= 0.0) return; // nothing opaque at all
+
+    colour::Lab pick;
+    if (colourful >= kMinColour * total) {
+        int best = -1;
+        double bestScore = 0;
+        for (int i = 0; i < kHues; ++i) {
+            const Bin& l = hues[(i + kHues - 1) % kHues];
+            const Bin& m = hues[i];
+            const Bin& r = hues[(i + 1) % kHues];
+            const double pop = 0.5 * l.w + m.w + 0.5 * r.w;
+            if (pop <= 0.0) continue;
+            const double meanC = (0.5 * l.c + m.c + 0.5 * r.c) / pop;
+            const double score = std::pow(pop / total, 0.7) * (0.5 + 4.0 * meanC);
+            if (score > bestScore) {
+                bestScore = score;
+                best = i;
+            }
+        }
+        if (best < 0) return;
+        Bin sum;
+        for (int d = -1; d <= 1; ++d) {
+            const Bin& b = hues[(best + d + kHues) % kHues];
+            sum.w += b.w;
+            sum.L += b.L;
+            sum.a += b.a;
+            sum.b += b.b;
+        }
+        pick = colour::Lab{static_cast<float>(sum.L / sum.w), static_cast<float>(sum.a / sum.w), static_cast<float>(sum.b / sum.w)};
+    } else {
+        // Monochrome: the most common grey level, averaged with its neighbours.
+        int best = 0;
+        for (int i = 1; i < kGreys; ++i)
+            if (greys[i].w > greys[best].w) best = i;
+        double w = 0, L = 0;
+        for (int d = -1; d <= 1; ++d) {
+            const int k = best + d;
+            if (k < 0 || k >= kGreys) continue;
+            w += greys[k].w;
+            L += greys[k].L;
+        }
+        if (w <= 0.0) return;
+        pick = colour::Lab{static_cast<float>(L / w), 0.f, 0.f};
+    }
+    art.accent = colour::toRgb(pick);
     art.hasAccent = true;
 }
-
-} // namespace
 
 bool startGdiplus() {
     std::lock_guard<std::mutex> lock(g_tokenMutex);

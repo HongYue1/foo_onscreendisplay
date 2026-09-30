@@ -2,6 +2,7 @@
 #include <objidl.h>
 #include <gdiplus.h>
 
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cwctype>
@@ -120,6 +121,7 @@ struct Faces::Impl {
     int historicFace = -1;
     float px = 12.f;
     int style = G::FontStyleRegular;
+    bool clearType = false;
     std::wstring key; // what init() was last called with; the same call again is a no-op
 
     int supplementaryFace(std::uint32_t cp) const {
@@ -273,10 +275,38 @@ void Faces::init(const std::string& primaryUtf8, const std::vector<std::string>&
     }
 }
 
+void Faces::setClearType(bool on) { m->clearType = on; }
+
+namespace {
+// Text wants hinting and whole-pixel glyph origins; the rest of the card is drawn with a half-pixel
+// offset and unhinted anti-aliasing, which is right for shapes but leaves glyph stems straddling
+// two pixels, which reads as blur at UI sizes. Set for one draw() and restored afterwards.
+class TextMode {
+public:
+    TextMode(G::Graphics& g, bool clearType)
+        : m_g(g), m_hint(g.GetTextRenderingHint()), m_offset(g.GetPixelOffsetMode()) {
+        g.SetTextRenderingHint(clearType ? G::TextRenderingHintClearTypeGridFit : G::TextRenderingHintAntiAliasGridFit);
+        g.SetPixelOffsetMode(G::PixelOffsetModeNone);
+    }
+    ~TextMode() {
+        m_g.SetTextRenderingHint(m_hint);
+        m_g.SetPixelOffsetMode(m_offset);
+    }
+    TextMode(const TextMode&) = delete;
+    TextMode& operator=(const TextMode&) = delete;
+
+private:
+    G::Graphics& m_g;
+    G::TextRenderingHint m_hint;
+    G::PixelOffsetMode m_offset;
+};
+} // namespace
+
 float Faces::draw(G::Graphics& g, const std::wstring& text, float x, float y, float w, float h, const G::Brush& brush,
                   bool alignRight) {
     Impl& s = *m;
     if (text.empty() || w <= 0.f || s.faces.empty()) return 0.f;
+    const TextMode mode(g, s.clearType); // measuring must use the same hinting as drawing
 
     std::vector<int> idx;
     s.assign(text, idx);
@@ -346,15 +376,17 @@ float Faces::draw(G::Graphics& g, const std::wstring& text, float x, float y, fl
 
     // One baseline for every run: each face is placed by its own ascent.
     Impl::Face& primary = s.ensure(0);
-    const float baseline = y + (h - (primary.ascent + primary.descent)) / 2.f + primary.ascent;
+    // The baseline and every run's start on whole pixels, so hinted stems land on the pixel grid.
+    const float baseline = std::round(y + (h - (primary.ascent + primary.descent)) / 2.f + primary.ascent);
     float cx = alignRight ? x + w - total : x;
     if (cx < x) cx = x;
     for (const auto& p : parts) {
         Impl::Face& f = s.ensure(static_cast<size_t>(p.face));
-        g.DrawString(text.c_str() + p.start, p.len, f.font.get(), G::PointF(cx, baseline - f.ascent), format(), &brush);
+        g.DrawString(text.c_str() + p.start, p.len, f.font.get(), G::PointF(std::round(cx), baseline - f.ascent), format(), &brush);
         cx += p.width;
     }
-    if (!ellipsis.empty()) g.DrawString(ellipsis.c_str(), 1, primary.font.get(), G::PointF(cx, baseline - primary.ascent), format(), &brush);
+    if (!ellipsis.empty())
+        g.DrawString(ellipsis.c_str(), 1, primary.font.get(), G::PointF(std::round(cx), baseline - primary.ascent), format(), &brush);
     return total;
 }
 

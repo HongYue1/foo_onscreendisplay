@@ -110,6 +110,7 @@ void visit(Settings& s, V& v) {
     v("detailPt", s.detailPt);
     v("detailWeight", s.detailWeight);
     v("detailItalic", s.detailItalic);
+    v("clearType", s.clearType);
     v("line1", s.line1);
     v("line2", s.line2);
     v("line3", s.line3);
@@ -147,8 +148,9 @@ void Settings::clamp() {
     accent &= 0xFFFFFFu;
 }
 
-void Settings::resetStyle() {
-    const Settings d;
+void Settings::resetStyle() { copyLook(Settings{}); }
+
+void Settings::copyLook(const Settings& d) {
     opacity = d.opacity;
     showArt = d.showArt;
     showProgress = d.showProgress;

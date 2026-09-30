@@ -12,8 +12,10 @@
 
 - **31 presets** and four layouts (Classic, Compact, Banner, Poster), or build your own look. The
   preferences page recognises a preset's look and names it, so you always know where you are.
-- **Accent from the cover.** The dominant colour of the artwork drives the progress bar and outline,
-  and is adjusted to stay readable. Greyscale covers get an off-white (dark card) or charcoal
+  **Save** your own looks as presets; they sit in the same list and can be deleted again.
+- **Accent from the cover.** The artwork's most telling colour (picked in the perceptual OKLab space,
+  so a small vivid patch beats a large dull area) drives the progress bar and outline, and is
+  adjusted to stay readable on the card without changing its hue. Greyscale covers get an off-white (dark card) or charcoal
   (light card) accent instead of an arbitrary colour.
 - **Your fonts.** Pick line 1 and lines 2-3 with the standard Windows font dialog (family, style, exact
   size). Unpicked fonts follow your Columns UI or Default UI font. Up to three **fallback fonts** cover
@@ -92,6 +94,10 @@ A preset only sets the look (the Style tab, plus the art shape, bar style and wh
 It never changes your fonts, size, margin, position, behaviour or track text. Change anything by
 hand and the Preset box says *Custom*; set it back and the name returns.
 
+**Save...** stores the current look under a name of your choice (saving under an existing name of
+yours replaces it; built-in names are taken). **Delete** removes the selected preset of yours. Both
+take effect at once, without Apply.
+
 | Preset | Look |
 | --- | --- |
 | **Midnight** (default) | Compact black card, square cover, thin bar, soft shadow |
@@ -124,6 +130,9 @@ Line 1 defaults to **11 pt bold** and lines 2-3 to **9 pt**, in your UI font. Th
 exact (at 100% Size). Fallback fonts are tried in order for characters the main font cannot draw,
 then built-in system fonts for CJK, symbols and emoji. A fallback only lends its family: size,
 weight and italic come from the line it is drawing.
+
+**Sharper text** (on by default) draws with ClearType when the card is fully opaque and Windows uses
+ClearType; otherwise text is greyscale anti-aliased. Either way it is hinted to whole pixels.
 
 ## Performance
 
@@ -178,8 +187,10 @@ To try a build without packaging, copy `x64\Release\foo_osd.dll` to
   truncated text, overlapping controls and controls outside the dialog. It uses the shared checker
   in `..\foobar2000-component-dev\scripts\`.
 - `test\build_render_test.bat` renders every preset offline, checks the frames, times them, checks
-  that every preset is recognised again and that settings survive a round trip, and writes contact
-  sheets to `test\out\` (`presets.jpg` shows all of them).
+  that every preset is recognised again, that settings and user presets survive a round trip and
+  that text leaves no holes in an opaque card, prints the accent picked from synthetic covers, and
+  writes contact sheets to `test\out\` (`presets.jpg` shows all of them, `accents.jpg` the covers,
+  `text_zoom.jpg` the text at 3x).
 
 ### Source map
 
@@ -188,7 +199,8 @@ To try a build without packaging, copy `x64\Release\foo_osd.dll` to
 | `src/component.cpp` | Identity, play callbacks, when to show, lazy start-up, menu commands |
 | `src/osd_window.cpp` | The card: layouts, GDI+ drawing, animation, caching |
 | `src/text_engine.cpp` | Single-line text with font fallback and ellipsis |
-| `src/presets.cpp` | The presets |
+| `src/presets.cpp` | Built-in and user presets |
+| `src/colour.h` | OKLab conversions and accent adjustment |
 | `src/artwork.cpp` | Cover decoding and accent colour (worker-thread safe), GDI+ lifetime |
 | `src/host_font.cpp` | The user's Columns UI / Default UI font |
 | `src/config.cpp` | `Settings` and their persistent storage |

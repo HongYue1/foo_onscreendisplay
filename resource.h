@@ -10,6 +10,9 @@
 #define IDD_OSD_TAB_ELEMENTS 104
 #define IDD_OSD_TAB_TEXT 105
 #define IDD_OSD_TAB_FONTS 106
+// The Save preset name prompt (modal, not a tab).
+#define IDD_OSD_PRESET_NAME 107
+#define IDC_PRESET_NAME 1067
 
 // Tab strip, and the (never shown) area the tab dialogs are placed in.
 #define IDC_TABS 1000
@@ -37,6 +40,8 @@
 
 // Style
 #define IDC_PRESET 1020
+#define IDC_PRESET_SAVE 1064
+#define IDC_PRESET_DELETE 1065
 #define IDC_OPACITY 1031
 #define IDC_LAYOUT 1040
 #define IDC_BG_MODE 1041
@@ -84,3 +89,4 @@
 #define IDC_FALLBACK_TEXT 1080
 #define IDC_FALLBACK_PICK 1083
 #define IDC_FALLBACK_CLEAR 1086
+#define IDC_CLEARTYPE 1066

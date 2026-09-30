@@ -29,6 +29,10 @@ public:
     void init(const std::string& primaryUtf8, const std::vector<std::string>& fallbacksUtf8, float emPixels, bool bold,
               bool italic = false);
 
+    //! ClearType needs an opaque background under the text and an opaque brush; without it the
+    //! text is drawn with hinted greyscale anti-aliasing. Either way glyphs sit on whole pixels.
+    void setClearType(bool on);
+
     //! Draws one line inside the box, vertically centred on the primary font's baseline.
     //! Truncates with an ellipsis when wider than w. Returns the width drawn.
     float draw(Gdiplus::Graphics& g, const std::wstring& text, float x, float y, float w, float h,
