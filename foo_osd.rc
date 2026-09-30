@@ -1,4 +1,4 @@
-// foo_osd resources: one preferences dialog. Coordinates are dialog units.
+// foo_osd resources: the preferences page and its four tabs. Coordinates are dialog units.
 
 #include "resource.h"
 #include "winres.h"
@@ -6,147 +6,164 @@
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 #pragma code_page(1252)
 
-// WS_CHILD, no border, no caption: foobar2000 parents this into its own preferences window.
-//
-// Four pages (General, Appearance, Text, Fonts) share this one dialog: the tab strip only
-// picks which run of controls is visible. The zero-size IDC_PAGE_* statics mark where each
-// page's controls start in this list, so no control needs a page id of its own. Keep them in
-// order. Controls listed before the first marker (the Preview row) show on every page.
-//
-// Sizing rule used here: text is about 3.7 DU per character plus 12 for a checkbox. Leave that
-// much room, or the label is cut off.
+// Preferences style profile (keep every tab consistent with this; see
+// foobar2000-component-dev/references/preferences-pages.md):
+//   sections : header + etched line, no group boxes, no bold
+//   fields   : labels in a left column, one label width per section, colon after
+//   rhythm   : check boxes 14 DU apart, field rows 16 DU (18 with push buttons), 12 DU before a
+//              new section header
+//   hints    : plain text under the control, or beside it for one short fact; units right of
+//              the field
+//   columns  : one column 7..293, or two: 7..147 and 155..293; content indented 5
+//   colours  : hex edit + swatch button that opens the colour picker
+
+// The page: tab strip, the area the tabs are placed in (IDC_PAGE_HOST, never shown) and the
+// Preview row that stays visible on every tab. WS_CHILD, no border: foobar2000 parents it.
 IDD_OSD_PREFERENCES DIALOGEX 0, 0, 300, 246
 STYLE DS_SETFONT | WS_CHILD
 FONT 8, "Microsoft Sans Serif", 400, 0, 0x0
 BEGIN
     CONTROL         "",IDC_TABS,"SysTabControl32",WS_CLIPSIBLINGS | WS_TABSTOP,7,3,286,17
-
-    // ---- Always visible ------------------------------------------------------------------
+    LTEXT           "",IDC_PAGE_HOST,0,24,300,198,NOT WS_VISIBLE
     PUSHBUTTON      "Preview",IDC_PREVIEW,7,227,50,14
     LTEXT           "Shows the card using the values on these pages, unsaved.",IDC_STATIC,64,230,229,8
+END
 
-    // ---- General -------------------------------------------------------------------------
-    LTEXT           "",IDC_PAGE_GENERAL,0,0,0,0,NOT WS_VISIBLE
-    LTEXT           "Preset:",IDC_STATIC,7,27,40,8
-    COMBOBOX        IDC_PRESET,50,25,130,160,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Sets the look only. Text and fonts stay.",IDC_STATIC,186,23,107,16
+// Tabs: child dialogs, 300 x 198, created once and shown one at a time.
 
-    LTEXT           "Behaviour",IDC_STATIC,7,50,140,8
-    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,60,140,1
-    CONTROL         "Enable the on-screen display",IDC_ENABLED,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,66,135,10
-    CONTROL         "Show when a track starts",IDC_ON_TRACK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,22,80,125,10
-    CONTROL         "Show when paused or resumed",IDC_ON_PAUSE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,22,94,125,10
-    CONTROL         "Show when seeking",IDC_ON_SEEK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,22,108,125,10
-    CONTROL         "Only when in the background",IDC_ONLY_UNFOCUSED,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,122,135,10
-    CONTROL         "Hide over full-screen apps",IDC_HIDE_FULLSCREEN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,136,135,10
-    CONTROL         "Show on foobar2000's monitor",IDC_FOLLOW_MONITOR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,150,135,10
+IDD_OSD_TAB_GENERAL DIALOGEX 0, 0, 300, 198
+STYLE DS_SETFONT | DS_CONTROL | WS_CHILD
+FONT 8, "Microsoft Sans Serif", 400, 0, 0x0
+BEGIN
+    LTEXT           "Preset:",IDC_STATIC,7,6,40,8
+    COMBOBOX        IDC_PRESET,50,4,130,160,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Sets the look only. Text and fonts stay.",IDC_STATIC,186,2,107,16
 
-    LTEXT           "Placement",IDC_STATIC,157,50,136,8
-    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,157,60,136,1
-    LTEXT           "Position:",IDC_STATIC,162,68,56,8
-    COMBOBOX        IDC_POSITION,222,66,71,100,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Margin:",IDC_STATIC,162,84,56,8
-    EDITTEXT        IDC_MARGIN,222,82,28,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "px",IDC_STATIC,254,84,39,8
-    LTEXT           "Size:",IDC_STATIC,162,100,56,8
-    EDITTEXT        IDC_SCALE,222,98,28,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "% (50-300)",IDC_STATIC,254,100,39,8
-    LTEXT           "Opacity:",IDC_STATIC,162,116,56,8
-    EDITTEXT        IDC_OPACITY,222,114,28,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "% (30-100)",IDC_STATIC,254,116,39,8
-    LTEXT           "Show for:",IDC_STATIC,162,132,56,8
-    EDITTEXT        IDC_SECONDS,222,130,28,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "seconds",IDC_STATIC,254,132,39,8
+    LTEXT           "Behaviour",IDC_STATIC,7,28,140,8
+    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,38,140,1
+    CONTROL         "Enable the on-screen display",IDC_ENABLED,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,44,135,10
+    CONTROL         "Show when a track starts",IDC_ON_TRACK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,22,58,125,10
+    CONTROL         "Show when paused or resumed",IDC_ON_PAUSE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,22,72,125,10
+    CONTROL         "Show when seeking",IDC_ON_SEEK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,22,86,125,10
+    CONTROL         "Only when in the background",IDC_ONLY_UNFOCUSED,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,100,135,10
+    CONTROL         "Hide over full-screen apps",IDC_HIDE_FULLSCREEN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,114,135,10
+    CONTROL         "Show on foobar2000's monitor",IDC_FOLLOW_MONITOR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,128,135,10
 
-    // ---- Appearance ----------------------------------------------------------------------
-    LTEXT           "",IDC_PAGE_APPEARANCE,0,0,0,0,NOT WS_VISIBLE
-    LTEXT           "Card",IDC_STATIC,7,24,140,8
-    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,34,140,1
-    LTEXT           "Layout:",IDC_STATIC,12,42,58,8
-    COMBOBOX        IDC_LAYOUT,72,40,75,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Background:",IDC_STATIC,12,58,58,8
-    COMBOBOX        IDC_BG_MODE,72,56,75,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Custom colour:",IDC_STATIC,12,74,58,8
-    EDITTEXT        IDC_BG_HEX,72,72,40,12,ES_AUTOHSCROLL | ES_UPPERCASE
-    LTEXT           "RRGGBB",IDC_STATIC,116,74,31,8
-    LTEXT           "Border:",IDC_STATIC,12,90,58,8
-    COMBOBOX        IDC_BORDER,72,88,75,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Corner radius:",IDC_STATIC,12,106,58,8
-    EDITTEXT        IDC_RADIUS,72,104,28,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "px",IDC_STATIC,104,106,43,8
-    LTEXT           "Art shape:",IDC_STATIC,12,122,58,8
-    COMBOBOX        IDC_ART_SHAPE,72,120,75,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Placement",IDC_STATIC,155,28,138,8
+    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,155,38,138,1
+    LTEXT           "Position:",IDC_STATIC,160,46,56,8
+    COMBOBOX        IDC_POSITION,219,44,74,100,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Margin:",IDC_STATIC,160,62,56,8
+    EDITTEXT        IDC_MARGIN,219,60,28,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "px",IDC_STATIC,251,62,42,8
+    LTEXT           "Size:",IDC_STATIC,160,78,56,8
+    EDITTEXT        IDC_SCALE,219,76,28,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "% (50-300)",IDC_STATIC,251,78,42,8
+    LTEXT           "Opacity:",IDC_STATIC,160,94,56,8
+    EDITTEXT        IDC_OPACITY,219,92,28,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "% (30-100)",IDC_STATIC,251,94,42,8
+    LTEXT           "Show for:",IDC_STATIC,160,110,56,8
+    EDITTEXT        IDC_SECONDS,219,108,28,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "seconds",IDC_STATIC,251,110,42,8
+END
 
-    LTEXT           "Colours and motion",IDC_STATIC,157,24,136,8
-    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,157,34,136,1
-    LTEXT           "Text colour:",IDC_STATIC,162,42,52,8
-    COMBOBOX        IDC_TEXT_MODE,216,40,77,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Custom text:",IDC_STATIC,162,58,52,8
-    EDITTEXT        IDC_TEXT_HEX,216,56,40,12,ES_AUTOHSCROLL | ES_UPPERCASE
-    LTEXT           "RRGGBB",IDC_STATIC,260,58,33,8
-    LTEXT           "Accent:",IDC_STATIC,162,74,52,8
-    EDITTEXT        IDC_ACCENT_HEX,216,72,40,12,ES_AUTOHSCROLL | ES_UPPERCASE
-    LTEXT           "RRGGBB",IDC_STATIC,260,74,33,8
-    LTEXT           "Animation:",IDC_STATIC,162,90,52,8
-    COMBOBOX        IDC_ANIMATION,216,88,77,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Speed:",IDC_STATIC,162,106,52,8
-    EDITTEXT        IDC_ANIM_SPEED,216,104,28,12,ES_AUTOHSCROLL | ES_NUMBER
-    LTEXT           "%",IDC_STATIC,248,106,45,8
-    LTEXT           "Bar style:",IDC_STATIC,162,122,52,8
-    COMBOBOX        IDC_BAR_STYLE,216,120,77,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+IDD_OSD_TAB_APPEARANCE DIALOGEX 0, 0, 300, 198
+STYLE DS_SETFONT | DS_CONTROL | WS_CHILD
+FONT 8, "Microsoft Sans Serif", 400, 0, 0x0
+BEGIN
+    LTEXT           "Card",IDC_STATIC,7,4,140,8
+    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,14,140,1
+    LTEXT           "Layout:",IDC_STATIC,12,22,58,8
+    COMBOBOX        IDC_LAYOUT,73,20,74,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Background:",IDC_STATIC,12,38,58,8
+    COMBOBOX        IDC_BG_MODE,73,36,74,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Custom colour:",IDC_STATIC,12,54,58,8
+    EDITTEXT        IDC_BG_HEX,73,52,40,12,ES_AUTOHSCROLL | ES_UPPERCASE
+    CONTROL         "",IDC_BG_SWATCH,"Button",BS_OWNERDRAW | WS_TABSTOP,117,52,24,12
+    LTEXT           "Border:",IDC_STATIC,12,70,58,8
+    COMBOBOX        IDC_BORDER,73,68,74,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Corner radius:",IDC_STATIC,12,86,58,8
+    EDITTEXT        IDC_RADIUS,73,84,28,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "px",IDC_STATIC,105,86,42,8
+    LTEXT           "Art shape:",IDC_STATIC,12,102,58,8
+    COMBOBOX        IDC_ART_SHAPE,73,100,74,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 
-    LTEXT           "Elements",IDC_STATIC,7,142,286,8
-    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,152,286,1
-    CONTROL         "Album art",IDC_SHOW_ART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,158,135,10
-    CONTROL         "Progress bar",IDC_SHOW_PROGRESS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,172,135,10
-    CONTROL         "Time labels",IDC_SHOW_TIMES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,186,135,10
-    CONTROL         "Play/pause icon",IDC_SHOW_GLYPH,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,200,135,10
-    CONTROL         "Progress bar knob",IDC_SHOW_KNOB,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,157,158,136,10
-    CONTROL         "Shadow",IDC_SHADOW,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,157,172,136,10
-    CONTROL         "Glossy top edge",IDC_SHEEN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,157,186,136,10
-    CONTROL         "Accent colour from cover art",IDC_ACCENT_COVER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,157,200,136,10
+    LTEXT           "Colours and motion",IDC_STATIC,155,4,138,8
+    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,155,14,138,1
+    LTEXT           "Text colour:",IDC_STATIC,160,22,52,8
+    COMBOBOX        IDC_TEXT_MODE,215,20,78,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Custom text:",IDC_STATIC,160,38,52,8
+    EDITTEXT        IDC_TEXT_HEX,215,36,40,12,ES_AUTOHSCROLL | ES_UPPERCASE
+    CONTROL         "",IDC_TEXT_SWATCH,"Button",BS_OWNERDRAW | WS_TABSTOP,259,36,24,12
+    LTEXT           "Accent:",IDC_STATIC,160,54,52,8
+    EDITTEXT        IDC_ACCENT_HEX,215,52,40,12,ES_AUTOHSCROLL | ES_UPPERCASE
+    CONTROL         "",IDC_ACCENT_SWATCH,"Button",BS_OWNERDRAW | WS_TABSTOP,259,52,24,12
+    LTEXT           "Animation:",IDC_STATIC,160,70,52,8
+    COMBOBOX        IDC_ANIMATION,215,68,78,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Speed:",IDC_STATIC,160,86,52,8
+    EDITTEXT        IDC_ANIM_SPEED,215,84,28,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "%",IDC_STATIC,247,86,46,8
+    LTEXT           "Bar style:",IDC_STATIC,160,102,52,8
+    COMBOBOX        IDC_BAR_STYLE,215,100,78,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 
-    // ---- Text ----------------------------------------------------------------------------
-    LTEXT           "",IDC_PAGE_TEXT,0,0,0,0,NOT WS_VISIBLE
-    LTEXT           "Track text",IDC_STATIC,7,24,286,8
-    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,34,286,1
-    LTEXT           "Line 1:",IDC_STATIC,12,42,34,8
-    EDITTEXT        IDC_LINE1,50,40,243,12,ES_AUTOHSCROLL
-    LTEXT           "Line 2:",IDC_STATIC,12,58,34,8
-    EDITTEXT        IDC_LINE2,50,56,243,12,ES_AUTOHSCROLL
-    LTEXT           "Line 3:",IDC_STATIC,12,74,34,8
-    EDITTEXT        IDC_LINE3,50,72,243,12,ES_AUTOHSCROLL
-    LTEXT           "Title formatting. An empty line is left out. Literal brackets need quotes: '('%date%')'",IDC_STATIC,50,90,243,16
-    PUSHBUTTON      "Help",IDC_TITLEFORMAT_HELP,50,110,46,14
-    PUSHBUTTON      "Default",IDC_TEXT_DEFAULT,100,110,46,14
+    LTEXT           "Elements",IDC_STATIC,7,124,286,8
+    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,134,286,1
+    CONTROL         "Album art",IDC_SHOW_ART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,140,135,10
+    CONTROL         "Progress bar",IDC_SHOW_PROGRESS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,154,135,10
+    CONTROL         "Time labels",IDC_SHOW_TIMES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,168,135,10
+    CONTROL         "Play/pause icon",IDC_SHOW_GLYPH,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,182,135,10
+    CONTROL         "Progress bar knob",IDC_SHOW_KNOB,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,160,140,133,10
+    CONTROL         "Shadow",IDC_SHADOW,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,160,154,133,10
+    CONTROL         "Glossy top edge",IDC_SHEEN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,160,168,133,10
+    CONTROL         "Accent colour from cover art",IDC_ACCENT_COVER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,160,182,133,10
+END
 
-    // ---- Fonts ---------------------------------------------------------------------------
-    LTEXT           "",IDC_PAGE_FONTS,0,0,0,0,NOT WS_VISIBLE
-    LTEXT           "Fonts",IDC_STATIC,7,24,286,8
-    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,34,286,1
-    LTEXT           "Line 1 font:",IDC_STATIC,12,42,70,8
-    LTEXT           "",IDC_TITLE_FONT,86,42,128,10,SS_NOPREFIX | SS_ENDELLIPSIS
-    PUSHBUTTON      "Select...",IDC_TITLE_FONT_PICK,218,39,38,13
-    PUSHBUTTON      "Default",IDC_TITLE_FONT_CLEAR,258,39,34,13
-    LTEXT           "Lines 2-3 font:",IDC_STATIC,12,58,70,8
-    LTEXT           "",IDC_DETAIL_FONT,86,58,128,10,SS_NOPREFIX | SS_ENDELLIPSIS
-    PUSHBUTTON      "Select...",IDC_DETAIL_FONT_PICK,218,55,38,13
-    PUSHBUTTON      "Default",IDC_DETAIL_FONT_CLEAR,258,55,34,13
-    LTEXT           "Default follows your Columns UI font, or the Default UI font. Line 1 is the title; lines 2-3 and the times use the second font. Picked sizes are exact.",IDC_STATIC,12,74,281,24
+IDD_OSD_TAB_TEXT DIALOGEX 0, 0, 300, 198
+STYLE DS_SETFONT | DS_CONTROL | WS_CHILD
+FONT 8, "Microsoft Sans Serif", 400, 0, 0x0
+BEGIN
+    LTEXT           "Track text",IDC_STATIC,7,4,286,8
+    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,14,286,1
+    LTEXT           "Line 1:",IDC_STATIC,12,22,34,8
+    EDITTEXT        IDC_LINE1,49,20,244,12,ES_AUTOHSCROLL
+    LTEXT           "Line 2:",IDC_STATIC,12,38,34,8
+    EDITTEXT        IDC_LINE2,49,36,244,12,ES_AUTOHSCROLL
+    LTEXT           "Line 3:",IDC_STATIC,12,54,34,8
+    EDITTEXT        IDC_LINE3,49,52,244,12,ES_AUTOHSCROLL
+    LTEXT           "Title formatting. An empty line is left out. Literal brackets need quotes: '('%date%')'",IDC_STATIC,49,66,244,16
+    PUSHBUTTON      "Help",IDC_TITLEFORMAT_HELP,49,86,46,14
+    PUSHBUTTON      "Default",IDC_TEXT_DEFAULT,99,86,46,14
+END
 
-    LTEXT           "Fallback fonts",IDC_STATIC,7,106,286,8
-    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,116,286,1
-    LTEXT           "Fallback 1:",IDC_STATIC,12,124,70,8
-    LTEXT           "",IDC_FALLBACK_TEXT,86,124,128,10,SS_NOPREFIX | SS_ENDELLIPSIS
-    PUSHBUTTON      "Select...",IDC_FALLBACK_PICK,218,121,38,13
-    PUSHBUTTON      "Clear",IDC_FALLBACK_CLEAR,258,121,34,13
-    LTEXT           "Fallback 2:",IDC_STATIC,12,140,70,8
-    LTEXT           "",1081,86,140,128,10,SS_NOPREFIX | SS_ENDELLIPSIS
-    PUSHBUTTON      "Select...",1084,218,137,38,13
-    PUSHBUTTON      "Clear",1087,258,137,34,13
-    LTEXT           "Fallback 3:",IDC_STATIC,12,156,70,8
-    LTEXT           "",1082,86,156,128,10,SS_NOPREFIX | SS_ENDELLIPSIS
-    PUSHBUTTON      "Select...",1085,218,153,38,13
-    PUSHBUTTON      "Clear",1088,258,153,34,13
-    LTEXT           "Tried in this order for characters the fonts above cannot draw. Only the family is used: size, weight and italic follow the line being drawn. Built-in fallbacks for CJK, symbols and emoji come after these.",IDC_STATIC,12,174,281,24
+IDD_OSD_TAB_FONTS DIALOGEX 0, 0, 300, 198
+STYLE DS_SETFONT | DS_CONTROL | WS_CHILD
+FONT 8, "Microsoft Sans Serif", 400, 0, 0x0
+BEGIN
+    LTEXT           "Fonts",IDC_STATIC,7,4,286,8
+    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,14,286,1
+    LTEXT           "Line 1 font:",IDC_STATIC,12,23,70,8
+    LTEXT           "",IDC_TITLE_FONT,85,23,108,10,SS_NOPREFIX | SS_ENDELLIPSIS
+    PUSHBUTTON      "Select...",IDC_TITLE_FONT_PICK,197,20,46,14
+    PUSHBUTTON      "Default",IDC_TITLE_FONT_CLEAR,247,20,46,14
+    LTEXT           "Lines 2-3 font:",IDC_STATIC,12,41,70,8
+    LTEXT           "",IDC_DETAIL_FONT,85,41,108,10,SS_NOPREFIX | SS_ENDELLIPSIS
+    PUSHBUTTON      "Select...",IDC_DETAIL_FONT_PICK,197,38,46,14
+    PUSHBUTTON      "Default",IDC_DETAIL_FONT_CLEAR,247,38,46,14
+    LTEXT           "Default follows your Columns UI font, or the Default UI font. Line 1 is the title; lines 2-3 and the times use the second font. Picked sizes are exact.",IDC_STATIC,12,56,281,24
+
+    LTEXT           "Fallback fonts",IDC_STATIC,7,92,286,8
+    CONTROL         "",IDC_STATIC,"Static",SS_ETCHEDHORZ,7,102,286,1
+    LTEXT           "Fallback 1:",IDC_STATIC,12,111,70,8
+    LTEXT           "",IDC_FALLBACK_TEXT,85,111,108,10,SS_NOPREFIX | SS_ENDELLIPSIS
+    PUSHBUTTON      "Select...",IDC_FALLBACK_PICK,197,108,46,14
+    PUSHBUTTON      "Clear",IDC_FALLBACK_CLEAR,247,108,46,14
+    LTEXT           "Fallback 2:",IDC_STATIC,12,129,70,8
+    LTEXT           "",1081,85,129,108,10,SS_NOPREFIX | SS_ENDELLIPSIS
+    PUSHBUTTON      "Select...",1084,197,126,46,14
+    PUSHBUTTON      "Clear",1087,247,126,46,14
+    LTEXT           "Fallback 3:",IDC_STATIC,12,147,70,8
+    LTEXT           "",1082,85,147,108,10,SS_NOPREFIX | SS_ENDELLIPSIS
+    PUSHBUTTON      "Select...",1085,197,144,46,14
+    PUSHBUTTON      "Clear",1088,247,144,46,14
+    LTEXT           "Tried in this order for characters the fonts above cannot draw. Only the family is used: size, weight and italic follow the line being drawn. Built-in fallbacks for CJK, symbols and emoji come after these.",IDC_STATIC,12,162,281,24
 END

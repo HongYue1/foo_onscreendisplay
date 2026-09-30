@@ -4,14 +4,15 @@
 // #define only. IDC_STATIC (-1) comes from winres.h.
 
 #define IDD_OSD_PREFERENCES 101
+// One child dialog per tab, consecutive and in tab order.
+#define IDD_OSD_TAB_GENERAL 102
+#define IDD_OSD_TAB_APPEARANCE 103
+#define IDD_OSD_TAB_TEXT 104
+#define IDD_OSD_TAB_FONTS 105
 
-// Tab strip and the zero-size markers that say where each page's controls start in the dialog
-// template. The three IDC_PAGE_* ids must stay consecutive and in tab order.
+// Tab strip, and the (never shown) area the tab dialogs are placed in.
 #define IDC_TABS 1000
-#define IDC_PAGE_GENERAL 1001
-#define IDC_PAGE_APPEARANCE 1002
-#define IDC_PAGE_TEXT 1003
-#define IDC_PAGE_FONTS 1004
+#define IDC_PAGE_HOST 1001
 
 // Always visible
 #define IDC_PREVIEW 1010
@@ -52,6 +53,10 @@
 #define IDC_SHADOW 1057
 #define IDC_SHEEN 1058
 #define IDC_ACCENT_COVER 1059
+// Colour swatches (owner-drawn buttons) next to the three hex fields; click opens the picker.
+#define IDC_BG_SWATCH 1060
+#define IDC_TEXT_SWATCH 1061
+#define IDC_ACCENT_SWATCH 1062
 
 // Text
 #define IDC_LINE1 1070
