@@ -37,7 +37,7 @@
 
 ## Install
 
-Requires foobar2000 v2 (64-bit) on Windows.
+Requires foobar2000 v2 on Windows, 32-bit or 64-bit (the package contains both).
 
 1. Download `foo_osd.fb2k-component` from the [latest release](https://github.com/HongYue1/foo_osd/releases/latest).
 2. Double-click it, or in foobar2000 open **Preferences > Components > Install...**, and restart.
@@ -141,7 +141,8 @@ Then, from `foo_osd/`:
 
 ```bat
 build.bat Release x64      :: builds the SDK libraries and the component, log in build.log
-package.bat                :: dist\foo_osd.fb2k-component (needs 7-Zip)
+build.bat Release Win32    :: the same for 32-bit
+package.bat                :: builds both, dist\foo_osd.fb2k-component (needs 7-Zip)
 ```
 
 `build.bat` and `package.bat` assume Visual Studio at `C:\Program Files\Microsoft Visual Studio\18\Community`
@@ -150,7 +151,8 @@ has another name, change `SdkRoot` in `foo_osd.vcxproj` and `SDK` in `build.bat`
 the static C runtime, so users need no redistributable.
 
 To try a build without packaging, copy `x64\Release\foo_osd.dll` to
-`%APPDATA%\foobar2000-v2\user-components-x64\foo_osd\` and restart foobar2000.
+`%APPDATA%\foobar2000-v2\user-components-x64\foo_osd\` (or `Win32\Release\foo_osd.dll` to
+`user-components\foo_osd\` for 32-bit) and restart foobar2000.
 
 ### Tests (no foobar2000 needed)
 
