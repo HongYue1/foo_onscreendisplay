@@ -160,6 +160,27 @@ static int CALLBACK family_found(const LOGFONTW*, const TEXTMETRICW*, DWORD, LPA
     return base_family(picked);
 }
 
+//! Text fields get some room before the first character: the Edit control's own margin is a
+//! pixel or two with the dialog font, so the text sat against the border. 4 px at 96 DPI.
+void pad_text_fields(HWND dialog) {
+    HDC dc = GetDC(dialog);
+    const int dpi = dc != nullptr ? GetDeviceCaps(dc, LOGPIXELSY) : 96;
+    if (dc != nullptr) ReleaseDC(dialog, dc);
+    const int pad = MulDiv(4, dpi, 96);
+    EnumChildWindows(
+        dialog,
+        [](HWND child, LPARAM pad) -> BOOL {
+            wchar_t name[16]{};
+            GetClassNameW(child, name, 16);
+            if (_wcsicmp(name, L"Edit") == 0) {
+                SendMessageW(child, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN,
+                             MAKELPARAM(pad, pad));
+            }
+            return TRUE;
+        },
+        pad);
+}
+
 //! The Windows font dialog, started from what is already chosen. Returns false on Cancel.
 //! defaultTenths / defaultWeight are what an unset choice actually renders as.
 bool pickFont(HWND owner, FontSel& f, int defaultTenths, int defaultWeight, bool familyOnly) {
@@ -291,6 +312,7 @@ private:
             if (tab == nullptr) continue;
             ::SetWindowPos(tab, ::GetDlgItem(m_hWnd, IDC_PAGE_HOST), host.left, host.top, host.Width(), host.Height(), SWP_NOACTIVATE);
             m_dark.AddDialogWithControls(tab);
+            pad_text_fields(tab);
         }
     }
 
