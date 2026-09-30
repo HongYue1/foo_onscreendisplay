@@ -5,7 +5,13 @@
 
 namespace osd {
 
-enum Position : int { TopLeft = 0, TopCenter, TopRight, BottomLeft, BottomCenter, BottomRight, PositionCount };
+// Stored as numbers: never reorder, only append.
+enum Position : int {
+    TopLeft = 0, TopCenter, TopRight, BottomLeft, BottomCenter, BottomRight, // 1.0
+    MiddleLeft, MiddleCenter, MiddleRight,                                   // 1.1
+    PositionCount
+};
+enum MonitorMode : int { MonitorMain = 0, MonitorPrimary, MonitorCursor, MonitorModeCount };
 enum LayoutKind : int { LayoutClassic = 0, LayoutCompact, LayoutBanner, LayoutPoster, LayoutCount };
 enum ArtShape : int { ArtRounded = 0, ArtCircle, ArtSquare, ArtShapeCount };
 enum BgMode : int { BgDark = 0, BgLight, BgCoverTint, BgCoverColour, BgCustom, BgModeCount };
@@ -21,23 +27,28 @@ struct Settings {
     // Behaviour
     bool enabled = true;
     bool onTrack = true;
+    bool onStreamTitle = true; // internet radio: the title changed under a running stream
     bool onPause = true;
     bool onSeek = false;
     bool onlyWhenUnfocused = false;
-    bool followMonitor = true;
     bool hideInFullscreen = true;
-    int seconds = 4; // fully visible time (1-30)
+    bool holdWhilePaused = false; // stay up while playback is paused
+    bool waitForArt = true;       // a new track's card waits (briefly) for its cover
+    bool fadeOnHover = true;      // turn nearly transparent while the mouse pointer is over it
+    int seconds = 4;              // fully visible time (1-30)
 
     // Placement
     int position = TopRight;
-    int margin = 32;  // px at 100% size (0-400)
-    int scale = 100;  // percent (50-300)
-    int opacity = 100; // card background, percent (30-100)
+    int monitor = MonitorMain; // 1.0 stored this as the followMonitor flag; parse() maps it
+    int margin = 32;           // px at 100% size (0-400)
+    int scale = 100;           // percent (50-300)
+    int opacity = 100;         // card background, percent (30-100)
 
     // Elements
     bool showArt = true;
     bool showProgress = true;
     bool showTimes = true;
+    bool showRemaining = false; // right-hand time is the time left, not the length
     bool showGlyph = true;
     bool showKnob = true;
 
@@ -57,6 +68,7 @@ struct Settings {
     std::uint32_t accent = 0x4DA3FF;
     int animation = AnimSlide;
     int animSpeed = 100; // percent (40-300)
+
     // Default sizes of the two fonts: 11 pt bold title, 9 pt detail.
     static constexpr int kTitleDefaultTenthsPt = 110;
     static constexpr int kDetailDefaultTenthsPt = 90;
@@ -82,10 +94,13 @@ struct Settings {
     std::string fallback2;
     std::string fallback3;
 
-    static Settings load();
+    //! The stored settings. Parsed once and kept; save() refreshes the copy. Main thread only.
+    static const Settings& current();
+    //! Stores these settings and makes them current(). Main thread only.
     void save() const;
     void clamp();
-    //! Back to the default look. Leaves behaviour, placement size, text lines and fallback fonts.
+    //! Back to the default look. Leaves behaviour, placement, elements that are not part of the
+    //! look, text lines and fonts alone.
     void resetStyle();
 
     std::string serialize() const;

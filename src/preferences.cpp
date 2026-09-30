@@ -1,10 +1,11 @@
 // Preferences > Tools > On-screen display.
 //
-// The page holds a tab strip and a Preview row; each tab (General, Appearance, Text, Fonts) is
-// its own child dialog (see foo_osd.rc), created once and shown one at a time. Control ids are
+// The page holds a tab strip and a Preview row; each tab (General, Style, Elements, Text, Fonts)
+// is its own child dialog (see foo_osd.rc), created once and shown one at a time. Control ids are
 // unique across the tabs, so dialogItem() finds any control wherever it lives and the children
 // forward their commands here. The dialog edits a Settings value; apply() saves it. "Preview"
-// shows the card with the dialog's current, unsaved values.
+// shows the card with the dialog's current, unsaved values. The Preset box names the preset the
+// look matches, or "Custom" once it has been changed by hand.
 
 #include <helpers/foobar2000+atl.h>
 #include <helpers/atl-misc.h>
@@ -23,6 +24,7 @@
 #include <cstdlib>
 #include <cwchar>
 #include <initializer_list>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -38,6 +40,11 @@ namespace {
 
 constexpr int kTextMax = 1024;
 constexpr int kFallbackCount = 3;
+
+// The Position box lists the spots in reading order; Settings::position keeps the stored order.
+constexpr int kPositionOrder[] = {TopLeft,    TopCenter,    TopRight,    MiddleLeft, MiddleCenter,
+                                  MiddleRight, BottomLeft, BottomCenter, BottomRight};
+static_assert(std::size(kPositionOrder) == PositionCount);
 
 // One font as the Windows font dialog reports it.
 struct FontSel {
@@ -232,11 +239,13 @@ public:
     // preferences_page_instance
     t_uint32 get_state() override {
         t_uint32 state = preferences_state::resettable | preferences_state::dark_mode_supported;
-        if (fromDialog().serialize() != Settings::load().serialize()) state |= preferences_state::changed;
+        if (fromDialog().serialize() != Settings::current().serialize()) state |= preferences_state::changed;
         return state;
     }
     void apply() override {
         fromDialog().save();
+        settingsChanged();
+        toDialog(Settings::current()); // show the values as stored, clamped to their ranges
         m_callback->on_state_changed();
     }
     void reset() override {
@@ -261,7 +270,9 @@ private:
         createTabs();
         setupTabs();
 
-        fill(IDC_POSITION, {L"Top left", L"Top center", L"Top right", L"Bottom left", L"Bottom center", L"Bottom right"});
+        fill(IDC_POSITION, {L"Top left", L"Top center", L"Top right", L"Middle left", L"Centre", L"Middle right",
+                            L"Bottom left", L"Bottom center", L"Bottom right"});
+        fill(IDC_MONITOR, {L"foobar2000's", L"Primary", L"Mouse pointer's"});
         fill(IDC_LAYOUT, {L"Classic", L"Compact", L"Banner", L"Poster"});
         fill(IDC_BG_MODE, {L"Dark", L"Light", L"Cover tint", L"Cover colour", L"Custom"});
         fill(IDC_TEXT_MODE, {L"Automatic", L"Custom"});
@@ -271,20 +282,26 @@ private:
         fill(IDC_BAR_STYLE, {L"Rounded", L"Thin", L"Thick"});
 
         CComboBox preset(GetDlgItem(IDC_PRESET));
-        preset.AddString(L"Choose a preset...");
+        preset.AddString(L"Custom");
         for (int i = 0; i < presets::count(); ++i) {
             preset.AddString(pfc::stringcvt::string_wide_from_utf8(presets::name(i)).get_ptr());
         }
 
-        toDialog(Settings::load());
+        // Title formatting fits comfortably in kTextMax; hex fields take "#RRGGBB".
+        for (int id : {IDC_LINE1, IDC_LINE2, IDC_LINE3}) GetDlgItem(id).SendMessage(EM_LIMITTEXT, kTextMax - 1);
+        for (int id : {IDC_BG_HEX, IDC_TEXT_HEX, IDC_ACCENT_HEX}) GetDlgItem(id).SendMessage(EM_LIMITTEXT, 7);
+        for (int id : {IDC_SECONDS, IDC_MARGIN, IDC_SCALE, IDC_OPACITY, IDC_RADIUS, IDC_ANIM_SPEED})
+            GetDlgItem(id).SendMessage(EM_LIMITTEXT, 3);
+
+        toDialog(Settings::current());
         showPage(0);
         return FALSE;
     }
 
     void setupTabs() {
         const HWND tabs = ::GetDlgItem(m_hWnd, IDC_TABS);
-        const wchar_t* const names[] = {L"General", L"Appearance", L"Text", L"Fonts"};
-        for (int i = 0; i < 4; ++i) {
+        const wchar_t* const names[kTabCount] = {L"General", L"Style", L"Elements", L"Text", L"Fonts"};
+        for (int i = 0; i < kTabCount; ++i) {
             TCITEMW item{};
             item.mask = TCIF_TEXT;
             item.pszText = const_cast<wchar_t*>(names[i]);
@@ -391,7 +408,6 @@ private:
             setText(IDC_LINE1, d.line1);
             setText(IDC_LINE2, d.line2);
             setText(IDC_LINE3, d.line3);
-            CComboBox(GetDlgItem(IDC_PRESET)).SetCurSel(0);
             m_callback->on_state_changed();
             return;
         }
@@ -400,13 +416,12 @@ private:
             return;
         }
         if (onFontButton(id)) {
-            CComboBox(GetDlgItem(IDC_PRESET)).SetCurSel(0);
             showFonts();
             m_callback->on_state_changed();
             return;
         }
-        // Any hand edit means the look is no longer exactly the preset named in the box.
-        CComboBox(GetDlgItem(IDC_PRESET)).SetCurSel(0);
+        // A hand edit may leave the look of a preset (or bring it back).
+        syncPreset();
         updateEnables();
         m_callback->on_state_changed();
     }
@@ -421,6 +436,10 @@ private:
         box.SetCurSel(sel);
         showPreview(s);
         m_callback->on_state_changed();
+    }
+
+    void syncPreset() {
+        CComboBox(GetDlgItem(IDC_PRESET)).SetCurSel(presets::match(fromDialog()) + 1);
     }
 
     // Returns true when id was a font Select/Default/Clear button (whether or not it changed anything).
@@ -474,9 +493,15 @@ private:
         GetDlgItem(IDC_BG_SWATCH).EnableWindow(bg);
         GetDlgItem(IDC_TEXT_HEX).EnableWindow(text);
         GetDlgItem(IDC_TEXT_SWATCH).EnableWindow(text);
-        // The three "Show when" options only matter while the display is on.
+        // Options only enabled while the option they depend on is on.
         const bool on = checked(IDC_ENABLED);
-        for (int id : {IDC_ON_TRACK, IDC_ON_PAUSE, IDC_ON_SEEK}) GetDlgItem(id).EnableWindow(on);
+        for (int id : {IDC_ON_TRACK, IDC_ON_STREAM, IDC_ON_PAUSE, IDC_ON_SEEK}) GetDlgItem(id).EnableWindow(on);
+        const bool art = checked(IDC_SHOW_ART);
+        GetDlgItem(IDC_ART_SHAPE).EnableWindow(art);
+        GetDlgItem(IDC_WAIT_ART).EnableWindow(art);
+        const bool bar = checked(IDC_SHOW_PROGRESS);
+        for (int id : {IDC_SHOW_KNOB, IDC_SHOW_TIMES, IDC_BAR_STYLE}) GetDlgItem(id).EnableWindow(bar);
+        GetDlgItem(IDC_SHOW_REMAINING).EnableWindow(bar && checked(IDC_SHOW_TIMES));
     }
 
     // ---- colour swatches ---------------------------------------------------------------------
@@ -587,14 +612,19 @@ private:
         Settings s;
         s.enabled = checked(IDC_ENABLED);
         s.onTrack = checked(IDC_ON_TRACK);
+        s.onStreamTitle = checked(IDC_ON_STREAM);
         s.onPause = checked(IDC_ON_PAUSE);
         s.onSeek = checked(IDC_ON_SEEK);
         s.onlyWhenUnfocused = checked(IDC_ONLY_UNFOCUSED);
         s.hideInFullscreen = checked(IDC_HIDE_FULLSCREEN);
-        s.followMonitor = checked(IDC_FOLLOW_MONITOR);
+        s.holdWhilePaused = checked(IDC_HOLD_PAUSED);
+        s.waitForArt = checked(IDC_WAIT_ART);
+        s.fadeOnHover = checked(IDC_FADE_HOVER);
         s.seconds = number(IDC_SECONDS, s.seconds);
 
-        s.position = selection(IDC_POSITION, s.position);
+        const int spot = selection(IDC_POSITION);
+        if (spot >= 0 && spot < PositionCount) s.position = kPositionOrder[spot];
+        s.monitor = selection(IDC_MONITOR, s.monitor);
         s.margin = number(IDC_MARGIN, s.margin);
         s.scale = number(IDC_SCALE, s.scale);
         s.opacity = number(IDC_OPACITY, s.opacity);
@@ -615,6 +645,7 @@ private:
         s.showArt = checked(IDC_SHOW_ART);
         s.showProgress = checked(IDC_SHOW_PROGRESS);
         s.showTimes = checked(IDC_SHOW_TIMES);
+        s.showRemaining = checked(IDC_SHOW_REMAINING);
         s.showGlyph = checked(IDC_SHOW_GLYPH);
         s.showKnob = checked(IDC_SHOW_KNOB);
         s.shadow = checked(IDC_SHADOW);
@@ -643,14 +674,19 @@ private:
         m_loading = true;
         check(IDC_ENABLED, s.enabled);
         check(IDC_ON_TRACK, s.onTrack);
+        check(IDC_ON_STREAM, s.onStreamTitle);
         check(IDC_ON_PAUSE, s.onPause);
         check(IDC_ON_SEEK, s.onSeek);
         check(IDC_ONLY_UNFOCUSED, s.onlyWhenUnfocused);
         check(IDC_HIDE_FULLSCREEN, s.hideInFullscreen);
-        check(IDC_FOLLOW_MONITOR, s.followMonitor);
+        check(IDC_HOLD_PAUSED, s.holdWhilePaused);
+        check(IDC_WAIT_ART, s.waitForArt);
+        check(IDC_FADE_HOVER, s.fadeOnHover);
         SetDlgItemInt(IDC_SECONDS, static_cast<UINT>(s.seconds), FALSE);
 
-        CComboBox(GetDlgItem(IDC_POSITION)).SetCurSel(s.position);
+        const int* spot = std::find(std::begin(kPositionOrder), std::end(kPositionOrder), s.position);
+        CComboBox(GetDlgItem(IDC_POSITION)).SetCurSel(spot != std::end(kPositionOrder) ? static_cast<int>(spot - kPositionOrder) : 2);
+        CComboBox(GetDlgItem(IDC_MONITOR)).SetCurSel(s.monitor);
         SetDlgItemInt(IDC_MARGIN, static_cast<UINT>(s.margin), FALSE);
         SetDlgItemInt(IDC_SCALE, static_cast<UINT>(s.scale), FALSE);
         SetDlgItemInt(IDC_OPACITY, static_cast<UINT>(s.opacity), FALSE);
@@ -671,6 +707,7 @@ private:
         check(IDC_SHOW_ART, s.showArt);
         check(IDC_SHOW_PROGRESS, s.showProgress);
         check(IDC_SHOW_TIMES, s.showTimes);
+        check(IDC_SHOW_REMAINING, s.showRemaining);
         check(IDC_SHOW_GLYPH, s.showGlyph);
         check(IDC_SHOW_KNOB, s.showKnob);
         check(IDC_SHADOW, s.shadow);
@@ -687,8 +724,8 @@ private:
         m_fallback[2] = s.fallback3;
         showFonts();
 
-        CComboBox(GetDlgItem(IDC_PRESET)).SetCurSel(0);
         m_loading = false;
+        syncPreset();
         updateEnables();
     }
 
@@ -696,7 +733,7 @@ private:
     fb2k::CDarkModeHooks m_dark; // must be a member of the dialog class
     bool m_loading = false;
     int m_page = -1;
-    static constexpr int kTabCount = 4;
+    static constexpr int kTabCount = 5;
     HWND m_tabs[kTabCount] = {};
     FontSel m_title;
     FontSel m_detail;

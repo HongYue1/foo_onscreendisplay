@@ -2,6 +2,7 @@
 #include <objidl.h>
 #include <gdiplus.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -20,8 +21,27 @@ namespace {
 
 constexpr wchar_t kClassName[] = L"foo_osd_window";
 constexpr UINT_PTR kTimerId = 1;
-constexpr UINT kAnimTimerMs = 16;  // fades: alpha/position only, no repaint
-constexpr UINT kHoldTimerMs = 250; // hold: progress row only when a pixel or second changed
+constexpr UINT kAnimTimerMs = 16;     // fades: alpha/position only, no repaint
+constexpr double kIdlePollMs = 1000;  // hold with nothing that can change (paused and kept up)
+constexpr double kHoverPollMs = 100;  // hold while "fade under the mouse pointer" is on
+constexpr float kHoverAlpha = 0.18f;  // how much of the card is left under the pointer
+constexpr float kHoverFadeMs = 140.f; // time for a full hover fade
+
+// The monitor's effective DPI. GetDpiForMonitor (Windows 8.1) is resolved at run time so the DLL
+// still loads on Windows 7, which the SDK targets; there the system DPI is the right answer anyway.
+UINT monitorDpi(HMONITOR mon) {
+    using Fn = HRESULT(WINAPI*)(HMONITOR, int, UINT*, UINT*);
+    static const Fn getDpiForMonitor = [] {
+        HMODULE shcore = LoadLibraryExW(L"shcore.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        return shcore ? reinterpret_cast<Fn>(reinterpret_cast<void*>(GetProcAddress(shcore, "GetDpiForMonitor"))) : nullptr;
+    }();
+    UINT x = 0, y = 0;
+    if (getDpiForMonitor && mon && SUCCEEDED(getDpiForMonitor(mon, 0 /* MDT_EFFECTIVE_DPI */, &x, &y)) && x != 0) return x;
+    HDC screen = GetDC(nullptr);
+    const int dpi = screen ? GetDeviceCaps(screen, LOGPIXELSX) : 96;
+    if (screen) ReleaseDC(nullptr, screen);
+    return dpi > 0 ? static_cast<UINT>(dpi) : 96u;
+}
 
 float clampf(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
 float minf(float a, float b) { return a < b ? a : b; }
@@ -214,6 +234,13 @@ LRESULT CALLBACK OsdWindow::wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             return 0;
         }
         break;
+    case WM_DISPLAYCHANGE:
+    case WM_SETTINGCHANGE:
+        // Monitors or the taskbar moved: keep a visible card inside the work area.
+        if (msg == WM_DISPLAYCHANGE || wp == SPI_SETWORKAREA) {
+            if (auto* self = reinterpret_cast<OsdWindow*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA))) self->onDisplayChanged();
+        }
+        break;
     case WM_NCHITTEST:
         return HTTRANSPARENT;
     case WM_MOUSEACTIVATE:
@@ -230,23 +257,36 @@ void OsdWindow::beginContent(const Settings& settings, const Content& content, H
     m_s = settings;
     m_s.clamp();
     m_c = content;
+    m_anchor = anchor;
+    placeOnMonitor();
+}
 
-    const bool haveAnchor = anchor != nullptr && IsWindow(anchor);
-    HMONITOR mon = (m_s.followMonitor && haveAnchor) ? MonitorFromWindow(anchor, MONITOR_DEFAULTTOPRIMARY)
-                                                     : MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
+// Picks the monitor, its work area and the scale (Size times the monitor's DPI).
+void OsdWindow::placeOnMonitor() {
+    HMONITOR mon = nullptr;
+    if (m_s.monitor == MonitorCursor) {
+        POINT pt{};
+        if (GetCursorPos(&pt)) mon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+    } else if (m_s.monitor == MonitorMain && m_anchor != nullptr && IsWindow(m_anchor)) {
+        mon = MonitorFromWindow(m_anchor, MONITOR_DEFAULTTONEAREST);
+    }
+    if (mon == nullptr) mon = MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
+
     MONITORINFO mi{};
     mi.cbSize = sizeof(mi);
     if (GetMonitorInfoW(mon, &mi))
         m_work = mi.rcWork;
     else
         SystemParametersInfoW(SPI_GETWORKAREA, 0, &m_work, 0);
+    m_l.scale = (static_cast<float>(m_s.scale) / 100.f) * (static_cast<float>(monitorDpi(mon)) / 96.f);
+}
 
-    UINT dpi = 96;
-    if (haveAnchor) {
-        const UINT d = GetDpiForWindow(anchor);
-        if (d != 0) dpi = d;
-    }
-    m_l.scale = (static_cast<float>(m_s.scale) / 100.f) * (static_cast<float>(dpi) / 96.f);
+void OsdWindow::onDisplayChanged() {
+    if (!m_hwnd || m_state == State::Hidden) return;
+    placeOnMonitor();
+    prepare();
+    renderStatic();
+    present(true);
 }
 
 void OsdWindow::show(const Settings& settings, const Content& content, HWND anchor) {
@@ -257,44 +297,55 @@ void OsdWindow::show(const Settings& settings, const Content& content, HWND anch
     m_lastKey = -1;
 
     const ULONGLONG now = GetTickCount64();
+    const bool wasHidden = m_state == State::Hidden;
     switch (m_state) {
     case State::Hidden:
         m_state = State::FadeIn;
         m_stateStart = now;
-        m_alpha = 0.f;
-        m_slide = 1.f;
+        m_alpha = m_fadeFrom = 0.f;
+        m_slide = m_slideFrom = 1.f;
+        m_hover = m_hoverTarget = 1.f;
         m_lastPos = POINT{-32000, -32000};
-        SetWindowPos(m_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
-        setTimer(kAnimTimerMs);
         break;
     case State::FadeIn:
-        break;
+        break; // already on its way in
     case State::Hold:
-        m_stateStart = now;
+        m_stateStart = now; // extend
         break;
     case State::FadeOut:
-        m_state = State::Hold;
+        // Turn round from where it is instead of jumping back to fully visible.
+        m_state = State::FadeIn;
         m_stateStart = now;
-        m_alpha = 1.f;
-        m_slide = 0.f;
-        setTimer(kHoldTimerMs);
+        m_fadeFrom = m_alpha;
+        m_slideFrom = m_slide;
         break;
     }
+    m_lastTick = now;
     present(true);
+    // Every show re-asserts topmost: another topmost window may have been raised since the last one.
+    SetWindowPos(m_hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | (wasHidden ? SWP_SHOWWINDOW : 0));
+    scheduleTimer(now);
 }
 
 void OsdWindow::setContent(const Content& content) {
     if (!m_hwnd || m_state == State::Hidden) return;
+    const ULONGLONG now = GetTickCount64();
+    // A card kept up by a pause starts its normal countdown once playback resumes.
+    if (m_state == State::Hold && m_s.holdWhilePaused && m_c.paused && !content.paused) m_stateStart = now;
     m_c = content;
     prepare();
     renderStatic();
     present(true);
+    scheduleTimer(now);
 }
 
 void OsdWindow::hide() {
     if (m_state == State::Hidden || m_state == State::FadeOut) return;
     m_state = State::FadeOut;
-    m_stateStart = GetTickCount64();
+    m_stateStart = m_lastTick = GetTickCount64();
+    m_fadeFrom = m_alpha;
+    m_slideFrom = m_slide;
     setTimer(kAnimTimerMs);
 }
 
@@ -304,8 +355,6 @@ const std::uint32_t* OsdWindow::debugRender(const Settings& settings, const Cont
     renderStatic();
     if (!m_bits) return nullptr;
     std::memcpy(m_bits, m_static.data(), m_static.size() * sizeof(std::uint32_t));
-    const double saved = position;
-    m_position = [saved] { return saved; };
     drawProgress(position);
     m_frameG->Flush(G::FlushIntentionSync);
     w = m_bufW;
@@ -315,9 +364,12 @@ const std::uint32_t* OsdWindow::debugRender(const Settings& settings, const Cont
 
 void OsdWindow::onTimer() {
     const ULONGLONG now = GetTickCount64();
+    const float sinceLast = static_cast<float>(now - m_lastTick);
+    m_lastTick = now;
     const double elapsed = static_cast<double>(now - m_stateStart);
     const double speed = static_cast<double>(m_s.animSpeed) / 100.0;
-    const double fadeIn = m_s.animation == AnimNone ? 0.0 : 220.0 / speed;
+    // A fade that starts part-way (reversed midway) takes the matching part of the time.
+    const double fadeIn = m_s.animation == AnimNone ? 0.0 : 220.0 / speed * (1.0 - m_fadeFrom);
     const double fadeOut = m_s.animation == AnimNone ? 0.0 : 420.0 / speed;
 
     switch (m_state) {
@@ -328,20 +380,21 @@ void OsdWindow::onTimer() {
             m_stateStart = now;
             m_alpha = 1.f;
             m_slide = 0.f;
-            setTimer(kHoldTimerMs);
         } else {
-            m_alpha = easeOutCubic(t);
-            m_slide = 1.f - m_alpha;
+            const float e = easeOutCubic(t);
+            m_alpha = m_fadeFrom + (1.f - m_fadeFrom) * e;
+            m_slide = m_slideFrom * (1.f - e);
         }
         break;
     }
     case State::Hold:
         m_alpha = 1.f;
         m_slide = 0.f;
-        if (elapsed >= static_cast<double>(m_s.seconds) * 1000.0) {
+        if (!(m_s.holdWhilePaused && m_c.paused) && elapsed >= static_cast<double>(m_s.seconds) * 1000.0) {
             m_state = State::FadeOut;
             m_stateStart = now;
-            setTimer(kAnimTimerMs);
+            m_fadeFrom = 1.f;
+            m_slideFrom = 0.f;
         }
         break;
     case State::FadeOut: {
@@ -353,15 +406,58 @@ void OsdWindow::onTimer() {
             ShowWindow(m_hwnd, SW_HIDE);
             return;
         }
-        m_alpha = 1.f - easeInCubic(t);
-        m_slide = easeInCubic(t) * 0.5f;
+        const float e = easeInCubic(t);
+        m_alpha = m_fadeFrom * (1.f - e);
+        m_slide = m_slideFrom + (0.5f - m_slideFrom) * e;
         break;
     }
     case State::Hidden:
         stopTimer();
         return;
     }
+    updateHover(sinceLast);
     present(false);
+    scheduleTimer(now);
+}
+
+// "Fade under the mouse pointer": the card is click-through, so it must not sit over what the
+// user is trying to read or click. Eases towards kHoverAlpha while the pointer is over the card.
+void OsdWindow::updateHover(float elapsedMs) {
+    m_hoverTarget = 1.f;
+    if (m_s.fadeOnHover && m_state != State::Hidden && m_lastPos.x != -32000) {
+        POINT pt{};
+        const RECT card{m_lastPos.x + m_l.shadow, m_lastPos.y + m_l.shadow, m_lastPos.x + m_l.shadow + m_l.cardW,
+                        m_lastPos.y + m_l.shadow + m_l.cardH};
+        if (GetCursorPos(&pt) && PtInRect(&card, pt)) m_hoverTarget = kHoverAlpha;
+    }
+    const float step = clampf(elapsedMs, 0.f, 100.f) / kHoverFadeMs;
+    m_hover = m_hover < m_hoverTarget ? minf(m_hoverTarget, m_hover + step) : maxf(m_hoverTarget, m_hover - step);
+}
+
+// Fades run at frame rate. The hold only wakes when something visible can change: the elapsed
+// time ticking over a second, the bar gaining a (half) pixel, the hold ending, or the hover poll.
+void OsdWindow::scheduleTimer(ULONGLONG now) {
+    if (!m_hwnd || m_state == State::Hidden) {
+        stopTimer();
+        return;
+    }
+    if (m_state != State::Hold || m_hover != m_hoverTarget) {
+        setTimer(kAnimTimerMs);
+        return;
+    }
+    double next = kIdlePollMs;
+    if (!(m_s.holdWhilePaused && m_c.paused)) {
+        const double left = static_cast<double>(m_s.seconds) * 1000.0 - static_cast<double>(now - m_stateStart);
+        next = (std::min)(next, (std::max)(left, 0.0) + 1.0);
+    }
+    if (m_l.hasBarRow && !m_c.paused && m_position) {
+        const double pos = m_position();
+        if (m_s.showTimes) next = (std::min)(next, (1.0 - (pos - std::floor(pos))) * 1000.0 + 15.0);
+        if (m_c.length > 0.0 && m_l.barW > 0.f)
+            next = (std::min)(next, (std::max)(m_c.length * 1000.0 / (static_cast<double>(m_l.barW) * 2.0), 33.0));
+    }
+    if (m_s.fadeOnHover) next = (std::min)(next, kHoverPollMs);
+    setTimer(static_cast<UINT>((std::max)(next, static_cast<double>(USER_TIMER_MINIMUM))));
 }
 
 // ---- Preparation: colours, layout, fonts, buffers ------------------------------------------
@@ -793,8 +889,13 @@ void OsdWindow::drawProgress(double pos) {
     if (m_c.length <= 0.0) return; // a stream: elapsed time only
 
     const float frac = clampf(static_cast<float>(pos / m_c.length), 0.f, 1.f);
-    if (m_s.showTimes)
-        m_faces[3].draw(g, formatTime(m_c.length), l.regionX + l.regionW - l.timeW, l.barRowY, l.timeW, l.barRowH, timeBrush, true);
+    if (m_s.showTimes) {
+        // Whole seconds on both sides, so the two labels tick over together.
+        const std::wstring right = m_s.showRemaining
+                                       ? L"-" + formatTime(std::floor(m_c.length) - std::floor(pos < 0.0 ? 0.0 : pos))
+                                       : formatTime(m_c.length);
+        m_faces[3].draw(g, right, l.regionX + l.regionW - l.timeW, l.barRowY, l.timeW, l.barRowH, timeBrush, true);
+    }
 
     const float by = l.barRowY + (l.barRowH - l.barH) / 2.f;
     G::GraphicsPath track;
@@ -823,20 +924,43 @@ void OsdWindow::computePlacement(int& x, int& y) const {
     const int off = roundi(m_slide * dist * l.scale);
     const int margin = roundi(static_cast<float>(m_s.margin) * l.scale);
     const int workW = m_work.right - m_work.left;
+    const int workH = m_work.bottom - m_work.top;
 
-    const bool left = m_s.position == TopLeft || m_s.position == BottomLeft;
-    const bool right = m_s.position == TopRight || m_s.position == BottomRight;
-    const bool top = m_s.position <= TopRight;
+    int col = 1, row = 0; // 0 left/top, 1 centre/middle, 2 right/bottom
+    switch (m_s.position) {
+    case TopLeft: col = 0; row = 0; break;
+    case TopCenter: col = 1; row = 0; break;
+    case TopRight: col = 2; row = 0; break;
+    case MiddleLeft: col = 0; row = 1; break;
+    case MiddleCenter: col = 1; row = 1; break;
+    case MiddleRight: col = 2; row = 1; break;
+    case BottomLeft: col = 0; row = 2; break;
+    case BottomCenter: col = 1; row = 2; break;
+    default: col = 2; row = 2; break;
+    }
 
-    if (left)
-        x = m_work.left + margin - l.shadow - off;
-    else if (right)
-        x = m_work.right - margin - l.cardW - l.shadow + off;
+    if (col == 0)
+        x = m_work.left + margin - l.shadow;
+    else if (col == 2)
+        x = m_work.right - margin - l.cardW - l.shadow;
     else
         x = m_work.left + (workW - l.cardW) / 2 - l.shadow;
 
-    y = top ? m_work.top + margin - l.shadow : m_work.bottom - margin - l.cardH - l.shadow;
-    if (!left && !right) y += top ? -off : off; // centred cards slide vertically
+    if (row == 0)
+        y = m_work.top + margin - l.shadow;
+    else if (row == 2)
+        y = m_work.bottom - margin - l.cardH - l.shadow;
+    else
+        y = m_work.top + (workH - l.cardH) / 2 - l.shadow;
+
+    // Cards at a side slide in from that side; centred ones from the top or bottom edge they sit
+    // on (the middle one rises from below).
+    if (col == 0)
+        x -= off;
+    else if (col == 2)
+        x += off;
+    else
+        y += row == 0 ? -off : off;
 }
 
 void OsdWindow::present(bool full) {
@@ -845,8 +969,11 @@ void OsdWindow::present(bool full) {
 
     const double pos = m_position ? m_position() : 0.0;
     const float frac = (m_c.length > 0.0) ? clampf(static_cast<float>(pos / m_c.length), 0.f, 1.f) : 0.f;
-    const BYTE alpha = static_cast<BYTE>(roundi(clampf(m_alpha, 0.f, 1.f) * 255.f));
-    const int key = static_cast<int>(pos) * 4096 + (l.hasBarRow ? static_cast<int>(frac * l.barW * 2.f) : 0);
+    const BYTE alpha = static_cast<BYTE>(roundi(clampf(m_alpha * m_hover, 0.f, 1.f) * 255.f));
+    // What the progress row shows: the whole second and the bar's half-pixel. 64-bit, as a stream
+    // can run for days.
+    const long long key = static_cast<long long>(pos < 0.0 ? 0.0 : pos) * 8192 +
+                          (l.hasBarRow ? static_cast<long long>(frac * l.barW * 2.f) : 0);
 
     int x = 0, y = 0;
     computePlacement(x, y);

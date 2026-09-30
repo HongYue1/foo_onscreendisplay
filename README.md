@@ -10,7 +10,8 @@
 
 ## Features
 
-- **21 presets** and four layouts (Classic, Compact, Banner, Poster), or build your own look.
+- **31 presets** and four layouts (Classic, Compact, Banner, Poster), or build your own look. The
+  preferences page recognises a preset's look and names it, so you always know where you are.
 - **Accent from the cover.** The dominant colour of the artwork drives the progress bar and outline,
   and is adjusted to stay readable. Greyscale covers get an off-white (dark card) or charcoal
   (light card) accent instead of an arbitrary colour.
@@ -18,9 +19,16 @@
   size). Unpicked fonts follow your Columns UI or Default UI font. Up to three **fallback fonts** cover
   characters the main font lacks (Cyrillic, CJK, symbols, emoji), on all lines.
 - **Your text.** Three lines written in foobar2000 title formatting.
-- **Well behaved.** Click-through, always on top, never takes focus. Follows the monitor foobar2000 is
-  on and per-monitor DPI. Optionally shows only while foobar2000 is in the background, and stays away
-  from full-screen apps.
+- **Nine positions** on foobar2000's monitor, the primary monitor or the one under the mouse
+  pointer, with per-monitor DPI. The card stays inside the work area when monitors or the taskbar
+  change.
+- **Well behaved.** Click-through, always on top, never takes focus. Turns nearly transparent while
+  the mouse pointer is over it, so it never hides what you are reading. Optionally shows only while
+  foobar2000 is in the background, and stays away from full-screen apps.
+- **No flicker.** A new track's card waits briefly for its cover instead of appearing without it and
+  jumping a moment later. Optionally stays up while playback is paused. The time label can show the
+  time left.
+- **Internet radio.** The card follows stream title changes (can be turned off).
 - **Light on resources.** Nothing runs while the card is hidden, and only the progress row is
   repainted while it is shown. See [Performance](#performance).
 
@@ -46,12 +54,13 @@ To remove it, use **Preferences > Components**.
 
 ## Use
 
-The card appears when a track starts, when playback is paused or resumed, and (if you turn it on)
-when you seek.
+The card appears when a track starts, when a stream title changes, when playback is paused or
+resumed, and (if you turn it on) when you seek.
 
-- **Settings:** Preferences > Tools > **On-screen display**, on four tabs: *General*, *Appearance*,
-  *Text* and *Fonts*.
-- **Menu:** View > On-screen display > *Show now* / *Enabled*.
+- **Settings:** Preferences > Tools > **On-screen display**, on five tabs: *General*, *Style*,
+  *Elements*, *Text* and *Fonts*.
+- **Menu:** View > On-screen display > *Show now* / *Hide* / *Enabled*. Assign them keyboard
+  shortcuts under Preferences > Keyboard Shortcuts.
 - **Preview:** shows the card with the values on the page, before you press Apply. Picking a preset
   applies its look to the page and previews it.
 
@@ -59,8 +68,9 @@ when you seek.
 
 | Tab | What is in it |
 | --- | --- |
-| General | What triggers the card, position, margin, size (50-300%), opacity, display time; follow foobar2000's monitor, hide over full-screen apps, only when in the background |
-| Appearance | Layout, background (dark, light, cover tint, cover colour, custom), border, corner radius, art shape, text colour, accent, animation and speed, bar style, and which elements show (art, progress bar, times, play/pause icon, knob, shadow, glossy edge, accent from cover) |
+| General | When the card shows (track start, stream title, pause, seek); how long, keep visible while paused, wait for the cover, fade under the mouse pointer, only in the background, hide over full-screen apps; position (nine spots), monitor, margin, size (50-300%) |
+| Style | Preset; layout, background (dark, light, cover tint, cover colour, custom), opacity, border, corner radius; text colour, accent (or from the cover), animation and speed; shadow, glossy edge |
+| Elements | Album art, play/pause icon, progress bar with knob, time labels and time left; art shape and bar style |
 | Text | The three track lines. **Help** opens foobar2000's title formatting reference; **Default** restores the three lines only |
 | Fonts | Line 1 font, lines 2-3 font, and three fallback fonts |
 
@@ -78,29 +88,35 @@ An empty line is left out. In title formatting, literal brackets need quotes: `'
 
 ### Presets
 
-A preset only sets the look. It never changes your fonts, size, margin, position, behaviour or
-track text.
+A preset only sets the look (the Style tab, plus the art shape, bar style and which elements show).
+It never changes your fonts, size, margin, position, behaviour or track text. Change anything by
+hand and the Preset box says *Custom*; set it back and the name returns.
 
 | Preset | Look |
 | --- | --- |
 | **Midnight** (default) | Compact black card, square cover, thin bar, soft shadow |
+| Graphite | The classic card: soft charcoal, fine edge, a touch of gloss |
 | Glass | Frosted, see-through dark pane |
+| AMOLED | Pure black, no shadow |
+| Flat | Square corners, no shadow or gloss |
+| Compact | One tight row of art and text, hairline bar |
+| Minimal | Just the words and a hairline: no cover, icon or times |
+| Quiet | Small, see-through, no shadow, gentle fade |
 | Snow | Light card |
+| Frost | Glass, in white |
+| Paper | Warm off-white, ink text, terracotta accent |
 | Cover colour | The card takes the cover's colour |
 | Cover tint | Dark card washed with the cover's colour |
-| AMOLED | Pure black, no shadow |
-| Neon | Dark card, accent outline, thick bar |
-| Compact | Small one-row card |
-| Banner | Wide and low, one row |
+| Spotlight | Big cover on a card of its own colour |
+| Banner | Wide and low, for a screen edge |
 | Poster | Large cover on top |
-| Circle | Round cover, rounded card |
+| Circle | Round cover like a record label |
 | Pill | Capsule with a round cover, no progress bar |
-| Flat | Square corners, no shadow or gloss |
+| Neon | Dark card, glowing accent outline, thick bar |
+| Bold | High contrast, outline in the cover's colour, chunky bar |
 | Retro terminal | Green on near-black, no cover |
 | Sunset, Ocean, Forest, Rose | Coloured themes with their own text tint |
-| Paper | Light and plain |
-| Bold | Near-black, accent outline, chunky bar |
-| Quiet | Small, translucent, no shadow, gentle fade |
+| Nord, Dracula, Solarized, Gruvbox, Catppuccin, Tokyo Night | The popular editor colour schemes |
 
 ### Fonts
 
@@ -115,10 +131,12 @@ weight and italic come from the line it is drawing.
   the first time a card is shown.
 - While hidden nothing runs: no timer, no polling.
 - A full repaint happens only when the card is shown or its content changes. Fades only change the
-  window's alpha and position. During the hold, only the progress row is repainted (4 Hz, and only
-  when a pixel or a second changed).
-- The shadow layer, scaled cover, GDI+ objects and font metrics are cached.
-- Cover decoding runs on a worker thread; the UI thread never waits on it.
+  window's alpha and position. During the hold, only the progress row is repainted, and the timer
+  wakes only when something can change: a second ticking over, the bar gaining a pixel, the hold
+  ending (plus a 10 Hz pointer check while *Fade under the mouse pointer* is on).
+- The shadow layer, scaled cover, GDI+ objects, font metrics and compiled title formatting are cached.
+- Cover decoding runs on a worker thread; the UI thread never waits on it. A cover is decoded once:
+  the next track of the same album reuses it.
 
 ## Building
 
@@ -156,10 +174,12 @@ To try a build without packaging, copy `x64\Release\foo_osd.dll` to
 
 ### Tests (no foobar2000 needed)
 
-- `test\build_dialog_check.bat` creates the real preferences dialog from `foo_osd.rc` and reports
-  truncated text, overlapping controls and controls outside the dialog.
-- `test\build_render_test.bat` renders every preset offline, checks the frames, times them and prints
-  an ASCII view of a few layouts.
+- `test\build_dialog_check.bat` creates the real preferences dialogs from `foo_osd.rc` and reports
+  truncated text, overlapping controls and controls outside the dialog. It uses the shared checker
+  in `..\foobar2000-component-dev\scripts\`.
+- `test\build_render_test.bat` renders every preset offline, checks the frames, times them, checks
+  that every preset is recognised again and that settings survive a round trip, and writes contact
+  sheets to `test\out\` (`presets.jpg` shows all of them).
 
 ### Source map
 

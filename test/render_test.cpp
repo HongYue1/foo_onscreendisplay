@@ -81,6 +81,7 @@ struct Frame {
 int findPreset(const char* name) {
     for (int i = 0; i < presets::count(); ++i)
         if (std::strncmp(presets::name(i), name, std::strlen(name)) == 0) return i;
+    std::printf("no preset named %s\n", name);
     return 0;
 }
 
@@ -152,6 +153,30 @@ void review(const std::vector<Frame>& left, const std::vector<Frame>& right, con
     put(right, lw + 16);
     saveJpeg(out, path, quality);
     std::printf("review sheet %dx%d\n", W, H);
+}
+
+// Trimmed frames packed in rows of cols, on the same backdrop as review().
+void grid(const std::vector<Frame>& frames, int cols, const std::wstring& path, ULONG quality, float scale = 1.f) {
+    int cw = 0, ch = 0;
+    for (const Frame& f : frames) {
+        cw = f.w > cw ? f.w : cw;
+        ch = f.h > ch ? f.h : ch;
+    }
+    const int rows = (static_cast<int>(frames.size()) + cols - 1) / cols;
+    const int W = cols * (cw + 8) + 8, H = rows * (ch + 8) + 8;
+    G::Bitmap out(static_cast<int>(W * scale), static_cast<int>(H * scale), PixelFormat24bppRGB);
+    G::Graphics g(&out);
+    g.Clear(G::Color(255, 72, 82, 98));
+    g.SetInterpolationMode(G::InterpolationModeHighQualityBicubic);
+    g.ScaleTransform(scale, scale);
+    for (size_t i = 0; i < frames.size(); ++i) {
+        const Frame& f = frames[i];
+        if (f.px.empty()) continue;
+        G::Bitmap b(f.w, f.h, f.w * 4, PixelFormat32bppPARGB, reinterpret_cast<BYTE*>(const_cast<std::uint32_t*>(f.px.data())));
+        g.DrawImage(&b, 8 + static_cast<int>(i % cols) * (cw + 8), 8 + static_cast<int>(i / cols) * (ch + 8), f.w, f.h);
+    }
+    saveJpeg(out, path, quality);
+    std::printf("presets sheet %dx%d\n", W, H);
 }
 
 // ASCII dump of a frame over black: block-averaged brightness, cells 3 px wide by 6 px tall.
@@ -246,12 +271,68 @@ int wmain(int argc, wchar_t** argv) {
             const char* verdict = opaque < static_cast<size_t>(w) * h / 20 ? "EMPTY?" : (edge > 0 ? "edge clipped" : "ok");
             if (verdict[0] != 'o') ++failures;
             std::printf("%-22s %4dx%-4d %9.2f %9.2f  %s\n", presets::name(i), w, h, t1 - t0, warm, verdict);
-            if (i == 2 || i == 5) { // Snow (shadow on), AMOLED (shadow off): alpha going up from the bottom edge
+            if (i == findPreset("Snow") || i == findPreset("AMOLED")) { // shadow on / off: alpha going up from the bottom edge
                 std::printf("  bottom alpha profile %s:", presets::name(i));
                 for (int y = h - 1; y >= h - 32 && y >= 0; --y) std::printf(" %u", f.px[static_cast<size_t>(y) * w + w / 2] >> 24);
                 std::printf("\n");
             }
             all.push_back(std::move(f));
+        }
+
+        // ---- presets are recognised again (the Preset box shows the name, not "Custom") -----
+        for (int i = 0; i < presets::count(); ++i) {
+            Settings s;
+            s.showArt = false; // elements the user owns must not matter
+            s.position = BottomLeft;
+            presets::apply(i, s);
+            const int m = presets::match(s);
+            if (m != i) {
+                std::printf("match(%s) = %d, expected %d\n", presets::name(i), m, i);
+                ++failures;
+            }
+        }
+        {
+            Settings s;
+            s.accent = 0x123456;
+            if (presets::match(s) != -1) {
+                std::printf("hand-edited look still matches a preset\n");
+                ++failures;
+            }
+            if (presets::match(Settings{}) != 0) {
+                std::printf("defaults do not match Midnight\n");
+                ++failures;
+            }
+        }
+
+        // ---- settings round trip, and the 1.0 followMonitor flag -----------------------------
+        {
+            Settings s;
+            s.position = MiddleCenter;
+            s.monitor = MonitorCursor;
+            s.showRemaining = true;
+            s.holdWhilePaused = true;
+            s.line1 = "a=b\nc";
+            if (Settings::parse(s.serialize()).serialize() != s.serialize()) {
+                std::printf("settings do not survive a round trip\n");
+                ++failures;
+            }
+            if (Settings::parse("followMonitor=0\n").monitor != MonitorPrimary ||
+                Settings::parse("followMonitor=1\n").monitor != MonitorMain) {
+                std::printf("followMonitor is not migrated\n");
+                ++failures;
+            }
+            if (Settings::parse("position=99\nseconds=0\n").position >= PositionCount) {
+                std::printf("position not clamped\n");
+                ++failures;
+            }
+        }
+
+        // ---- all presets, trimmed, three to a row: presets.jpg ------------------------------
+        {
+            std::vector<Frame> trimmed;
+            for (const Frame& f : all) trimmed.push_back(trim(f));
+            grid(trimmed, 3, dir + L"\\presets.jpg", 70);
+            grid(trimmed, 4, dir + L"\\presets_small.jpg", 40, 0.42f); // for a quick look
         }
 
         // ---- picked sizes are exact: 12 pt title / 10 pt detail is the Classic layout's own size ----

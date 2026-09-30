@@ -10,10 +10,17 @@ namespace osd {
 //! playing, or sample text when nothing is.
 void showPreview(const Settings& settings);
 
-//! Show the card now with the saved settings (menu command).
+//! Show the card now with the saved settings (menu command). Does nothing while stopped.
 void showNow();
 
-//! Flip Settings::enabled and save it.
+//! Fade the card out if it is showing (menu command).
+void hideNow();
+
+//! Call after Settings::save(): hides the card when the OSD was turned off, stops following
+//! artwork when it is no longer shown, and drops cached title formatting.
+void settingsChanged();
+
+//! Flip Settings::enabled, save it and apply it.
 void toggleEnabled();
 
 } // namespace osd

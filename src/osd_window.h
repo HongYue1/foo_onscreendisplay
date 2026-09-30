@@ -7,7 +7,8 @@
 // Cost model (see the README): nothing runs while hidden; a full repaint happens only when the
 // card is shown or its content changes; during the hold only the progress row is repainted, and
 // only when a pixel or a second changed; during fades only the layered window's alpha/position
-// is updated, with no repaint at all.
+// is updated, with no repaint at all. The hold timer is re-armed for the next moment something
+// can change (a second ticking over, the bar gaining a pixel, the hold ending), not polled.
 
 #include <windows.h>
 
@@ -60,11 +61,12 @@ public:
     // Where the progress bar gets its playback position from, in seconds.
     void setPositionSource(std::function<double()> fn) { m_position = std::move(fn); }
 
-    // Show (or refresh and extend) the card. anchor decides the monitor and DPI.
+    // Show (or refresh and extend) the card. anchor is foobar2000's main window: with
+    // MonitorMain it decides the monitor. The DPI is always the chosen monitor's.
     void show(const Settings& settings, const Content& content, HWND anchor);
-    // Replace what a visible card displays (new artwork, pause state) without restarting it.
+    // Replace what a visible card displays (new artwork, text, pause state) without restarting it.
     void setContent(const Content& content);
-    // Start fading out.
+    // Start fading out from wherever the card is now.
     void hide();
 
     bool visible() const { return m_state != State::Hidden; }
@@ -106,6 +108,10 @@ private:
 
     static LRESULT CALLBACK wndProc(HWND, UINT, WPARAM, LPARAM);
     void beginContent(const Settings& s, const Content& c, HWND anchor);
+    void placeOnMonitor();
+    void onDisplayChanged();
+    void updateHover(float elapsedMs);
+    void scheduleTimer(ULONGLONG now);
     void prepare();
     void resolveColors();
     void computeLayout();
@@ -146,14 +152,20 @@ private:
     Layout m_l;
     Colors m_col;
     RECT m_work{};
+    HWND m_anchor = nullptr;
     text::Faces m_faces[4]; // title, line 2, line 3, times
 
     State m_state = State::Hidden;
     ULONGLONG m_stateStart = 0;
-    float m_alpha = 0.f;
-    float m_slide = 0.f;
+    ULONGLONG m_lastTick = 0;
+    float m_alpha = 0.f;     // animation alpha, 0-1
+    float m_slide = 0.f;     // animation offset, 0 = in place
+    float m_fadeFrom = 0.f;  // alpha when the current fade started, so a fade reversed midway does not jump
+    float m_slideFrom = 0.f; // slide when the current fade started
+    float m_hover = 1.f;     // multiplier while the mouse pointer is over the card
+    float m_hoverTarget = 1.f;
     UINT m_timerMs = 0;
-    int m_lastKey = -1;
+    long long m_lastKey = -1;
     BYTE m_lastAlpha = 0;
     POINT m_lastPos{-32000, -32000};
 

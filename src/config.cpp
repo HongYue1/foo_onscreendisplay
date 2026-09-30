@@ -67,19 +67,24 @@ template <class V>
 void visit(Settings& s, V& v) {
     v("enabled", s.enabled);
     v("onTrack", s.onTrack);
+    v("onStreamTitle", s.onStreamTitle);
     v("onPause", s.onPause);
     v("onSeek", s.onSeek);
     v("onlyWhenUnfocused", s.onlyWhenUnfocused);
-    v("followMonitor", s.followMonitor);
     v("hideInFullscreen", s.hideInFullscreen);
+    v("holdWhilePaused", s.holdWhilePaused);
+    v("waitForArt", s.waitForArt);
+    v("fadeOnHover", s.fadeOnHover);
     v("seconds", s.seconds);
     v("position", s.position);
+    v("monitor", s.monitor);
     v("margin", s.margin);
     v("scale", s.scale);
     v("opacity", s.opacity);
     v("showArt", s.showArt);
     v("showProgress", s.showProgress);
     v("showTimes", s.showTimes);
+    v("showRemaining", s.showRemaining);
     v("showGlyph", s.showGlyph);
     v("showKnob", s.showKnob);
     v("layout", s.layout);
@@ -120,6 +125,7 @@ int clampInt(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 void Settings::clamp() {
     seconds = clampInt(seconds, 1, 30);
     position = clampInt(position, 0, PositionCount - 1);
+    monitor = clampInt(monitor, 0, MonitorModeCount - 1);
     margin = clampInt(margin, 0, 400);
     scale = clampInt(scale, 50, 300);
     opacity = clampInt(opacity, 30, 100);
@@ -186,18 +192,37 @@ Settings Settings::parse(const std::string& blob) {
     }
     Settings s;
     visit(s, r);
+    // 1.0 had a followMonitor flag where 1.1 has a monitor choice.
+    if (r.find("monitor") == nullptr) {
+        if (const std::string* follow = r.find("followMonitor")) s.monitor = *follow == "0" ? MonitorPrimary : MonitorMain;
+    }
     s.clamp();
     return s;
 }
 
 #ifndef OSD_STANDALONE
-Settings Settings::load() {
-    const pfc::string8 blob = c_blob.get();
-    if (blob.is_empty()) return Settings{};
-    return parse(blob.c_str());
+namespace {
+Settings g_current;
+bool g_currentLoaded = false;
+} // namespace
+
+// cfg_var values are read from the profile before any initquit runs, so the first call (from
+// on_init at the earliest) already sees the stored blob.
+const Settings& Settings::current() {
+    if (!g_currentLoaded) {
+        const pfc::string8 blob = c_blob.get();
+        g_current = blob.is_empty() ? Settings{} : parse(blob.c_str());
+        g_currentLoaded = true;
+    }
+    return g_current;
 }
 
-void Settings::save() const { c_blob = serialize().c_str(); }
+void Settings::save() const {
+    const std::string blob = serialize();
+    c_blob = blob.c_str();
+    g_current = parse(blob);
+    g_currentLoaded = true;
+}
 #endif
 
 } // namespace osd

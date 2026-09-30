@@ -2,6 +2,8 @@
 #include <objidl.h>
 #include <gdiplus.h>
 
+#include <cstdint>
+#include <cstdio>
 #include <cwctype>
 #include <memory>
 #include <unordered_map>
@@ -90,8 +92,17 @@ bool isNeutral(wchar_t c) {
 const wchar_t* const kSystemFallbacks[] = {
     L"Segoe UI",           L"Segoe UI Symbol",     L"Segoe UI Emoji",       L"Microsoft YaHei UI", L"Yu Gothic UI",
     L"Malgun Gothic",      L"Microsoft JhengHei UI", L"Nirmala UI",         L"Leelawadee UI",      L"Segoe UI Historic",
-    L"Arial Unicode MS",   L"Arial",               L"Tahoma",
+    L"SimSun-ExtB",        L"MingLiU-ExtB",        L"Arial Unicode MS",     L"Arial",              L"Tahoma",
 };
+
+// Where a character outside the BMP goes. GetGlyphIndicesW only understands UTF-16 units, so
+// these cannot be coverage-tested like the rest and are routed by range instead.
+enum class Plane1 { Emoji, Ideograph, Other };
+Plane1 classify(std::uint32_t cp) {
+    if ((cp >= 0x1F000 && cp <= 0x1FAFF) || (cp >= 0x1FC00 && cp <= 0x1FFFF)) return Plane1::Emoji;
+    if (cp >= 0x20000 && cp <= 0x3FFFF) return Plane1::Ideograph; // CJK extensions B and later
+    return Plane1::Other;                                         // maths alphanumerics, historic scripts
+}
 
 } // namespace
 
@@ -105,8 +116,21 @@ struct Faces::Impl {
     std::vector<Face> faces; // the chain, primary first
     int emojiFace = -1;
     int symbolFace = -1;
+    int ideographFace = -1; // SimSun-ExtB / MingLiU-ExtB
+    int historicFace = -1;
     float px = 12.f;
     int style = G::FontStyleRegular;
+    std::wstring key; // what init() was last called with; the same call again is a no-op
+
+    int supplementaryFace(std::uint32_t cp) const {
+        int f = -1;
+        switch (classify(cp)) {
+        case Plane1::Emoji: f = emojiFace >= 0 ? emojiFace : symbolFace; break;
+        case Plane1::Ideograph: f = ideographFace; break;
+        case Plane1::Other: f = symbolFace >= 0 ? symbolFace : historicFace; break;
+        }
+        return f >= 0 ? f : 0;
+    }
 
     Face& ensure(size_t i) {
         Face& f = faces[i];
@@ -139,12 +163,13 @@ struct Faces::Impl {
             return;
         }
 
-        // Anything outside the BMP goes to an emoji/symbol face when we have one.
+        // Anything outside the BMP is routed by range (see classify).
         size_t remaining = 0;
         for (size_t i = 0; i < n; ++i) {
             if (isHighSurrogate(t[i]) && i + 1 < n && isLowSurrogate(t[i + 1])) {
-                const int f = emojiFace >= 0 ? emojiFace : (symbolFace >= 0 ? symbolFace : 0);
-                idx[i] = idx[i + 1] = f;
+                const std::uint32_t cp = 0x10000u + ((static_cast<std::uint32_t>(t[i]) - 0xD800u) << 10) +
+                                         (static_cast<std::uint32_t>(t[i + 1]) - 0xDC00u);
+                idx[i] = idx[i + 1] = supplementaryFace(cp);
                 ++i;
             } else if (isNeutral(t[i])) {
                 idx[i] = -2; // resolved from a neighbour below
@@ -195,14 +220,26 @@ Faces::~Faces() = default;
 
 void Faces::init(const std::string& primaryUtf8, const std::vector<std::string>& fallbacksUtf8, float emPixels, bool bold, bool italic) {
     Impl& s = *m;
-    s.faces.clear();
-    s.emojiFace = s.symbolFace = -1;
-    s.px = emPixels < 1.f ? 1.f : emPixels;
-    s.style = (bold ? G::FontStyleBold : 0) | (italic ? G::FontStyleItalic : 0);
+    const float px = emPixels < 1.f ? 1.f : emPixels;
+    const int style = (bold ? G::FontStyleBold : 0) | (italic ? G::FontStyleItalic : 0);
 
     std::vector<std::wstring> names;
     names.push_back(toWide(primaryUtf8));
     for (const auto& f : fallbacksUtf8) names.push_back(toWide(f));
+
+    // Every card calls this; the fonts only need rebuilding when something actually changed.
+    std::wstring key;
+    for (const auto& n : names) (key += n) += L'\x1F';
+    wchar_t tail[48];
+    swprintf_s(tail, L"%.3f|%d", px, style);
+    key += tail;
+    if (key == s.key && !s.faces.empty()) return;
+    s.key = std::move(key);
+
+    s.faces.clear();
+    s.emojiFace = s.symbolFace = s.ideographFace = s.historicFace = -1;
+    s.px = px;
+    s.style = style;
     for (const wchar_t* d : kSystemFallbacks) names.push_back(d);
 
     std::vector<std::wstring> seen;
@@ -217,8 +254,11 @@ void Faces::init(const std::string& primaryUtf8, const std::vector<std::string>&
         Impl::Face face;
         face.info = fi;
         s.faces.push_back(std::move(face));
-        if (key == L"segoe ui emoji") s.emojiFace = static_cast<int>(s.faces.size()) - 1;
-        if (key == L"segoe ui symbol") s.symbolFace = static_cast<int>(s.faces.size()) - 1;
+        const int at = static_cast<int>(s.faces.size()) - 1;
+        if (key == L"segoe ui emoji") s.emojiFace = at;
+        else if (key == L"segoe ui symbol") s.symbolFace = at;
+        else if (key == L"segoe ui historic") s.historicFace = at;
+        else if (s.ideographFace < 0 && (key == L"simsun-extb" || key == L"mingliu-extb")) s.ideographFace = at;
     }
     if (s.faces.empty()) {
         // No usable family at all (not expected on Windows): the generic family always exists.
