@@ -146,7 +146,7 @@ ClearType; otherwise text is greyscale anti-aliased. Either way it is hinted to 
   ending (plus a 10 Hz pointer check while *Fade under the mouse pointer* is on).
 - The shadow layer, scaled cover, GDI+ objects, font metrics and compiled title formatting are cached.
 - Cover decoding runs on a worker thread; the UI thread never waits on it. A cover is decoded once:
-  the next track of the same album reuses it.
+  the next track of the same album reuses it. Picking its accent colour adds about 2 ms there.
 
 ## Building
 
