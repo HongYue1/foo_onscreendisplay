@@ -209,11 +209,11 @@ To try a build without packaging, copy `x64\Release\foo_osd.dll` to
 
 Settings are stored as one key=value text blob, so adding an option never breaks an existing profile.
 
-## See also
-
-- [foo_bettertabs](https://github.com/HongYue1/foo_bettertabs): a tab container for Columns UI and
-  the Default UI.
-
-## License
+## See also
+
+- [foo_bettertabs](https://github.com/HongYue1/foo_bettertabs): a tab container for Columns UI and
+  the Default UI.
+
+## License
 
 [MIT](LICENSE)
