@@ -16,7 +16,7 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{5B0C7B57-6F0D-4C9F-9C0E-3D7B1B7E2A41}</ProjectGuid>
-    <RootNamespace>foo_osd</RootNamespace>
+    <RootNamespace>foo_onscreendisplay</RootNamespace>
     <Keyword>Win32Proj</Keyword>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
@@ -50,7 +50,7 @@
     <CuiLibSubDir Condition="'$(Platform)'=='Win32'">$(Configuration)</CuiLibSubDir>
   </PropertyGroup>
   <PropertyGroup>
-    <TargetName>foo_osd</TargetName>
+    <TargetName>foo_onscreendisplay</TargetName>
     <OutDir>$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(Platform)\$(Configuration)\obj\</IntDir>
     <LinkIncremental Condition="'$(Configuration)'=='Release'">false</LinkIncremental>
@@ -125,7 +125,7 @@
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="foo_osd.rc" />
+    <ResourceCompile Include="foo_onscreendisplay.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

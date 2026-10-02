@@ -1,6 +1,6 @@
 #pragma once
 
-// Resource IDs shared by foo_osd.rc and the C++ side. Included by the resource compiler, so
+// Resource IDs shared by foo_onscreendisplay.rc and the C++ side. Included by the resource compiler, so
 // #define only. IDC_STATIC (-1) comes from winres.h. Control ids are unique across all tabs.
 
 #define IDD_OSD_PREFERENCES 101

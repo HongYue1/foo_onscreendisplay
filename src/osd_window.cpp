@@ -20,7 +20,7 @@ namespace G = Gdiplus;
 namespace osd {
 namespace {
 
-constexpr wchar_t kClassName[] = L"foo_osd_window";
+constexpr wchar_t kClassName[] = L"foo_onscreendisplay_window";
 constexpr UINT_PTR kTimerId = 1;
 constexpr UINT kAnimTimerMs = 16;     // fades: alpha/position only, no repaint
 constexpr double kIdlePollMs = 1000;  // hold with nothing that can change (paused and kept up)
@@ -130,7 +130,7 @@ bool OsdWindow::create() {
     if (!RegisterClassExW(&wc) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) return false;
 
     m_hwnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
-                             kClassName, L"foo_osd", WS_POPUP, 0, 0, 1, 1, nullptr, nullptr, inst, this);
+                             kClassName, L"foo_onscreendisplay", WS_POPUP, 0, 0, 1, 1, nullptr, nullptr, inst, this);
     if (!m_hwnd) return false;
 
     HDC screen = GetDC(nullptr);

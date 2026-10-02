@@ -1,4 +1,4 @@
-// foo_osd resources: the preferences page and its five tabs. Coordinates are dialog units.
+// foo_onscreendisplay resources: the preferences page and its five tabs. Coordinates are dialog units.
 
 #include "resource.h"
 #include "winres.h"

@@ -2,7 +2,7 @@
 
 #include <guiddef.h>
 
-// Fresh GUIDs generated for foo_osd. Every GUID is this component's own: never copy one from
+// Fresh GUIDs generated for foo_onscreendisplay. Every GUID is this component's own: never copy one from
 // another component (sample code included). Add new ones here, not inline.
 
 namespace osd::guids {

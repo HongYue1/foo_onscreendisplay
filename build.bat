@@ -1,5 +1,5 @@
 @echo off
-rem Build foo_osd. Usage: build.bat [Release|Debug] [x64|Win32]
+rem Build foo_onscreendisplay. Usage: build.bat [Release|Debug] [x64|Win32]
 rem Read results from build.log, not stdout.
 setlocal
 set CFG=%1
@@ -43,5 +43,5 @@ if errorlevel 1 (
   exit /b 1
 )
 
-%MSB% "foo_osd.vcxproj" /p:Configuration=%CFG% %LOG%
+%MSB% "foo_onscreendisplay.vcxproj" /p:Configuration=%CFG% %LOG%
 echo EXITCODE=%ERRORLEVEL%

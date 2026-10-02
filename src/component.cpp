@@ -1,4 +1,4 @@
-// foo_osd: a modern on-screen display for foobar2000 v2.
+// foo_onscreendisplay: a modern on-screen display for foobar2000 v2.
 //
 // Component identity, the playback controller that decides when the card shows, and the main
 // menu commands. Drawing lives in osd_window.cpp, artwork decoding in artwork.cpp, text and font
@@ -38,7 +38,7 @@ DECLARE_COMPONENT_VERSION(OSD_NAME, OSD_VERSION,
                           "Commands: View > On-screen display.");
 
 // Stops users from renaming the DLL, which would confuse the troubleshooter.
-VALIDATE_COMPONENT_FILENAME("foo_osd.dll");
+VALIDATE_COMPONENT_FILENAME("foo_onscreendisplay.dll");
 
 namespace osd {
 namespace {
@@ -296,12 +296,12 @@ private:
         if (m_failed) return false;
         if (!startGdiplus()) {
             m_failed = true;
-            console::error("foo_osd: GDI+ failed to start, the on-screen display is disabled");
+            console::error("foo_onscreendisplay: GDI+ failed to start, the on-screen display is disabled");
             return false;
         }
         if (!m_window.create()) {
             m_failed = true;
-            console::error("foo_osd: could not create the OSD window");
+            console::error("foo_onscreendisplay: could not create the OSD window");
             return false;
         }
         m_window.setPositionSource([this] { return currentPosition(); });

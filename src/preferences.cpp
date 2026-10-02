@@ -1,7 +1,7 @@
 // Preferences > Tools > On-screen display.
 //
 // The page holds a tab strip and a Preview row; each tab (General, Style, Elements, Text, Fonts)
-// is its own child dialog (see foo_osd.rc), created once and shown one at a time. Control ids are
+// is its own child dialog (see foo_onscreendisplay.rc), created once and shown one at a time. Control ids are
 // unique across the tabs, so dialogItem() finds any control wherever it lives and the children
 // forward their commands here. The dialog edits a Settings value; apply() saves it. "Preview"
 // shows the card with the dialog's current, unsaved values. The Preset box names the preset the

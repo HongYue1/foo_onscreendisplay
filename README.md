@@ -1,11 +1,11 @@
-<h1 align="center">foo_osd</h1>
+<h1 align="center">foo_onscreendisplay</h1>
 
 <p align="center">
   A modern on-screen display for <a href="https://www.foobar2000.org/">foobar2000</a> v2.<br />
 </p>
 
 <p align="center">
-  <img src="docs/images/accent-from-cover.png" alt="foo_osd card with a violet accent taken from the cover art" width="600" />
+  <img src="docs/images/accent-from-cover.png" alt="foo_onscreendisplay card with a violet accent taken from the cover art" width="600" />
 </p>
 
 ## Features
@@ -50,10 +50,14 @@
 
 Requires foobar2000 v2 on Windows, 32-bit or 64-bit (the package contains both).
 
-1. Download `foo_osd.fb2k-component` from the [latest release](https://github.com/HongYue1/foo_osd/releases/latest).
+1. Download `foo_onscreendisplay.fb2k-component` from the [latest release](https://github.com/HongYue1/foo_onscreendisplay/releases/latest).
 2. Double-click it, or in foobar2000 open **Preferences > Components > Install...**, and restart.
 
 To remove it, use **Preferences > Components**.
+
+**Upgrading from 1.2.0 or older:** this component used to be called `foo_osd`. Remove the old
+`foo_osd` entry under **Preferences > Components** before installing `foo_onscreendisplay`; the two
+must not be installed side by side. Your settings carry over.
 
 ## Use
 
@@ -156,7 +160,7 @@ The project builds against sibling folders rather than vendored copies:
 
 ```
 some-folder/
-  foo_osd/             this repository
+  foo_onscreendisplay/             this repository
   SDK-2026-09-17/      foobar2000 SDK, with the Columns UI SDK cloned inside as columns_ui-sdk/
   wtl/                 WTL (the folder that contains Include/)
 ```
@@ -165,26 +169,26 @@ some-folder/
 - Columns UI SDK: <https://github.com/reupen/columns_ui-sdk>
 - WTL: <https://sourceforge.net/projects/wtl/>
 
-Then, from `foo_osd/`:
+Then, from `foo_onscreendisplay/`:
 
 ```bat
 build.bat Release x64      :: builds the SDK libraries and the component, log in build.log
 build.bat Release Win32    :: the same for 32-bit
-package.bat                :: builds both, dist\foo_osd.fb2k-component (needs 7-Zip)
+package.bat                :: builds both, dist\foo_onscreendisplay.fb2k-component (needs 7-Zip)
 ```
 
 `build.bat` and `package.bat` assume Visual Studio at `C:\Program Files\Microsoft Visual Studio\18\Community`
 and 7-Zip at `C:\Program Files\7-Zip`; edit the paths at the top if yours differ. If your SDK folder
-has another name, change `SdkRoot` in `foo_osd.vcxproj` and `SDK` in `build.bat`. The component links
+has another name, change `SdkRoot` in `foo_onscreendisplay.vcxproj` and `SDK` in `build.bat`. The component links
 the static C runtime, so users need no redistributable.
 
-To try a build without packaging, copy `x64\Release\foo_osd.dll` to
-`%APPDATA%\foobar2000-v2\user-components-x64\foo_osd\` (or `Win32\Release\foo_osd.dll` to
-`user-components\foo_osd\` for 32-bit) and restart foobar2000.
+To try a build without packaging, copy `x64\Release\foo_onscreendisplay.dll` to
+`%APPDATA%\foobar2000-v2\user-components-x64\foo_onscreendisplay\` (or `Win32\Release\foo_onscreendisplay.dll` to
+`user-components\foo_onscreendisplay\` for 32-bit) and restart foobar2000.
 
 ### Tests (no foobar2000 needed)
 
-- `test\build_dialog_check.bat` creates the real preferences dialogs from `foo_osd.rc` and reports
+- `test\build_dialog_check.bat` creates the real preferences dialogs from `foo_onscreendisplay.rc` and reports
   truncated text, overlapping controls and controls outside the dialog. It uses the shared checker
   in `..\foobar2000-component-dev\scripts\`.
 - `test\build_render_test.bat` renders every preset offline, checks the frames, times them, checks
