@@ -157,6 +157,8 @@ public:
     // ---- artwork, main thread ----------------------------------------------------------------
 
     void onArt(album_art_data::ptr data) {
+        // Null is ignored: a track without art was not seen to deliver one (2026-10-07), so the
+        // wait for the cover always runs its full time.
         if (data.is_empty() || !m_following) return;
         if (sameImage(data, m_artData)) {
             // Same cover as before (next track of the same album): no decode.

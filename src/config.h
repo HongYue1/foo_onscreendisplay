@@ -33,7 +33,7 @@ struct Settings {
     bool onlyWhenUnfocused = false;
     bool hideInFullscreen = true;
     bool holdWhilePaused = false; // stay up while playback is paused
-    bool waitForArt = true;       // a new track's card waits (briefly) for its cover
+    bool waitForArt = false;      // a new track's card waits (briefly, 0.4 s) for its cover
     bool fadeOnHover = true;      // turn nearly transparent while the mouse pointer is over it
     int seconds = 4;              // fully visible time (1-30)
 
