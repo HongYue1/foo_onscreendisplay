@@ -64,12 +64,6 @@ std::uint32_t mixRgb(std::uint32_t a, std::uint32_t b, float t) {
     return (ch(16) << 16) | (ch(8) << 8) | ch(0);
 }
 
-float luminance(std::uint32_t c) {
-    return (0.2126f * static_cast<float>((c >> 16) & 0xFF) + 0.7152f * static_cast<float>((c >> 8) & 0xFF) +
-            0.0722f * static_cast<float>(c & 0xFF)) /
-           255.f;
-}
-
 void roundedPath(G::GraphicsPath& p, const G::RectF& r, float radius) {
     float d = radius * 2.f;
     if (d > r.Width) d = r.Width;
@@ -455,10 +449,13 @@ void OsdWindow::resolveColors() {
         c.bg = mixRgb(0x15151A, c.accent, 0.08f * tint);
         break;
     }
-    c.lightBg = luminance(c.bg) > 0.58f;
+    // Dark or light text, whichever reads better on the card by APCA (fb2k-common); a fixed
+    // brightness cutoff got mid-tone cards (orange, teal, a custom grey) wrong.
+    constexpr std::uint32_t kDarkText = 0x141418u;
+    c.lightBg = std::fabs(colour::apca_contrast(kDarkText, c.bg)) > std::fabs(colour::apca_contrast(0xFFFFFFu, c.bg));
     // Against the card it is drawn on: APCA Lc 45 on a dark card, 55 on a light one (fb2k-common).
     if (fromCover) c.accent = colour::accent_for_background(c.accent, c.bg);
-    c.text = m_s.textMode == TextCustom ? m_s.textColor : (c.lightBg ? 0x141418u : 0xFFFFFFu);
+    c.text = m_s.textMode == TextCustom ? m_s.textColor : (c.lightBg ? kDarkText : 0xFFFFFFu);
     c.fg = m_s.bgMode == BgCoverColour ? c.text : c.accent;
     // A custom accent is the user's choice: only nudged when it would vanish into the card.
     if (m_s.bgMode != BgCoverColour) c.fg = colour::with_min_lc(c.fg, c.bg, colour::accent_min_lc_for(c.bg));
