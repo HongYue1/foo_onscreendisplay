@@ -427,7 +427,7 @@ int wmain(int argc, wchar_t** argv) {
                 pickAccent(*a);
                 const double t1 = nowMs();
                 std::printf("accent %-20s %s #%06X -> dark card #%06X, light card #%06X  (%.2f ms)\n", cv.name, a->hasAccent ? "yes" : "no ", a->accent,
-                            colour::accentForCard(a->accent, false), colour::accentForCard(a->accent, true), t1 - t0);
+                            colour::accent_for_background(a->accent, 0x15151Au), colour::accent_for_background(a->accent, 0xF4F4F7u), t1 - t0);
                 Content c = latin;
                 c.line1 = std::wstring(cv.name, cv.name + std::strlen(cv.name));
                 c.art = a;

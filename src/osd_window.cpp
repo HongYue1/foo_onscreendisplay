@@ -452,10 +452,12 @@ void OsdWindow::resolveColors() {
         break;
     }
     c.lightBg = luminance(c.bg) > 0.58f;
-    if (fromCover) c.accent = colour::accentForCard(c.accent, c.lightBg);
+    // Against the card it is drawn on: APCA Lc 45 on a dark card, 55 on a light one (fb2k-common).
+    if (fromCover) c.accent = colour::accent_for_background(c.accent, c.bg);
     c.text = m_s.textMode == TextCustom ? m_s.textColor : (c.lightBg ? 0x141418u : 0xFFFFFFu);
     c.fg = m_s.bgMode == BgCoverColour ? c.text : c.accent;
-    if (c.lightBg && m_s.bgMode != BgCoverColour && luminance(c.fg) > 0.65f) c.fg = mixRgb(c.fg, 0x000000, 0.4f);
+    // A custom accent is the user's choice: only nudged when it would vanish into the card.
+    if (m_s.bgMode != BgCoverColour) c.fg = colour::with_min_lc(c.fg, c.bg, colour::accent_min_lc_for(c.bg));
 }
 
 void OsdWindow::computeLayout() {

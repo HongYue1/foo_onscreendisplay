@@ -163,6 +163,7 @@ some-folder/
   foo_onscreendisplay/             this repository
   SDK-2026-09-17/      foobar2000 SDK, with the Columns UI SDK cloned inside as columns_ui-sdk/
   wtl/                 WTL (the folder that contains Include/)
+  fb2k-common/         colour code shared with the author's other components (cover colour, contrast)
 ```
 
 - foobar2000 SDK: <https://www.foobar2000.org/SDK>
@@ -205,7 +206,7 @@ To try a build without packaging, copy `x64\Release\foo_onscreendisplay.dll` to
 | `src/osd_window.cpp` | The card: layouts, GDI+ drawing, animation, caching |
 | `src/text_engine.cpp` | Single-line text with font fallback and ellipsis |
 | `src/presets.cpp` | Built-in and user presets |
-| `src/colour.h` | OKLab conversions and accent adjustment |
+| `src/colour.h` | Forwards to `fb2k-common`: OKLab, APCA contrast, accent adjustment |
 | `src/artwork.cpp` | Cover decoding and accent colour (worker-thread safe), GDI+ lifetime |
 | `src/host_font.cpp` | The user's Columns UI / Default UI font |
 | `src/config.cpp` | `Settings` and their persistent storage |
