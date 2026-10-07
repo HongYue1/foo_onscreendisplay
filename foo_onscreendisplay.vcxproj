@@ -106,6 +106,7 @@
     <ClCompile Include="src\config.cpp" />
     <ClCompile Include="src\artwork.cpp" />
     <ClCompile Include="..\fb2k-common\src\cover_accent.cpp" />
+    <ClCompile Include="..\fb2k-common\src\fonts.cpp" />
     <ClCompile Include="src\osd_window.cpp" />
     <ClCompile Include="src\host_font.cpp" />
     <ClCompile Include="src\preferences.cpp" />

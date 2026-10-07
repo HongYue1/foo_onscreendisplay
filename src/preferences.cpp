@@ -28,6 +28,8 @@
 #include <string>
 #include <vector>
 
+#include "fbc/fonts.h"
+
 #include "../resource.h"
 #include "config.h"
 #include "controller.h"
@@ -46,188 +48,22 @@ constexpr int kPositionOrder[] = {TopLeft,    TopCenter,    TopRight,    MiddleL
                                   MiddleRight, BottomLeft, BottomCenter, BottomRight};
 static_assert(std::size(kPositionOrder) == PositionCount);
 
-// One font as the Windows font dialog reports it.
-struct FontSel {
-    std::string family; // empty = default
-    int tenthsPt = 0;   // 0 = the layout's own size
-    int weight = 0;     // 0 = default (bold title, regular detail)
-    bool italic = false;
-};
+// Font rows and pickers come from fb2k-common (fbc/fonts.h), shared with my other components.
+using FontSel = fbc::fonts::FontChoice;
+using fbc::fonts::pad_text_fields;
 
-//! "IBM Plex Sans, 12pt, Bold, Italic". Nothing picked reads as "Default (<UI font>)".
+//! "IBM Plex Sans, 12pt, Bold". Nothing picked reads as "Default (<UI font>, 11pt, Bold)".
 std::string describeFont(const FontSel& f, const std::string& host, int defaultTenths, const char* defaultStyle) {
-    const std::string family = f.family.empty() ? (host.empty() ? std::string("Segoe UI") : host) : f.family;
-    if (f.family.empty() && (f.tenthsPt == 0 || f.tenthsPt == defaultTenths) && f.weight == 0 && !f.italic) {
-        std::string text = "Default (" + family;
-        char size[24]{};
-        if (defaultTenths % 10 == 0) std::snprintf(size, sizeof size, ", %dpt", defaultTenths / 10);
-        else std::snprintf(size, sizeof size, ", %d.%dpt", defaultTenths / 10, defaultTenths % 10);
-        text += size;
-        if (*defaultStyle) (text += ", ") += defaultStyle;
-        return text + ")";
-    }
-    std::string text = family;
-    if (f.tenthsPt != 0) {
-        char size[24]{};
-        if (f.tenthsPt % 10 == 0) std::snprintf(size, sizeof size, ", %dpt", f.tenthsPt / 10);
-        else std::snprintf(size, sizeof size, ", %d.%dpt", f.tenthsPt / 10, f.tenthsPt % 10);
-        text += size;
-    }
-    const char* weight = nullptr;
-    switch (f.weight / 100) {
-    case 1: weight = "Thin"; break;
-    case 2: weight = "Extra Light"; break;
-    case 3: weight = "Light"; break;
-    case 4: weight = "Regular"; break;
-    case 5: weight = "Medium"; break;
-    case 6: weight = "Semi Bold"; break;
-    case 7: weight = "Bold"; break;
-    case 8: weight = "Extra Bold"; break;
-    case 9: weight = "Black"; break;
-    default: break;
-    }
-    if (weight) (text += ", ") += weight;
-    if (f.italic) text += ", Italic";
-    return text;
+    if (!f.family.empty()) return fbc::fonts::describe(f);
+    return fbc::fonts::describe_default({host, static_cast<std::uint32_t>(defaultTenths), FW_NORMAL}, defaultStyle);
 }
 
-//! What the Font dialog's family box said when OK was pressed. Only filled for family-only picks.
-thread_local std::wstring g_picked_family;
-
-//! For a fallback font only the family matters, so the dialog's style and size pickers are hidden
-//! (they would suggest a choice that has no effect) and the caption says so.
-UINT_PTR CALLBACK family_only_hook(HWND dlg, UINT msg, WPARAM wparam, LPARAM) {
-    if (msg == WM_INITDIALOG) {
-        // stc2/stc3 (labels) and cmb2/cmb3 (style, size) of the common Font dialog.
-        for (int id : {0x441, 0x442, 0x471, 0x472})
-            if (HWND h = GetDlgItem(dlg, id)) ShowWindow(h, SW_HIDE);
-        SetWindowTextW(dlg, L"Fallback font (family only)");
-        g_picked_family.clear();
-    } else if (msg == WM_COMMAND && LOWORD(wparam) == IDOK) {
-        // cmb1, the family box: the name the user actually chose.
-        wchar_t name[LF_FACESIZE]{};
-        GetDlgItemTextW(dlg, 0x470, name, LF_FACESIZE);
-        g_picked_family = name;
-    }
-    return 0;
-}
-
-//! The family a picked font belongs to, weights and all. ChooseFont names the GDI family of the
-//! style it has selected, and a family with more than four styles is split into one GDI family per
-//! weight: "IBM Plex Sans JP Thin". With the style list hidden that is whichever style comes first,
-//! so a fallback came back as Thin. DirectWrite groups the weights, so its name is the one to keep.
-//! Falls back to the GDI name when DirectWrite or GDI does not know the grouped name.
-static int CALLBACK family_found(const LOGFONTW*, const TEXTMETRICW*, DWORD, LPARAM found) {
-    *reinterpret_cast<bool*>(found) = true;
-    return 0;
-}
-[[nodiscard]] bool gdi_has_family(const std::wstring& name) {
-    LOGFONTW probe{};
-    probe.lfCharSet = DEFAULT_CHARSET;
-    wcsncpy_s(probe.lfFaceName, name.c_str(), _TRUNCATE);
-    bool found = false;
-    if (HDC screen = GetDC(nullptr)) {
-        EnumFontFamiliesExW(screen, &probe, &family_found, reinterpret_cast<LPARAM>(&found), 0);
-        ReleaseDC(nullptr, screen);
-    }
-    return found;
-}
-[[nodiscard]] std::wstring base_family(const LOGFONTW& picked) {
-    const std::wstring gdi_name = picked.lfFaceName;
-    CComPtr<IDWriteFactory> factory;
-    CComPtr<IDWriteGdiInterop> interop;
-    CComPtr<IDWriteFont> font;
-    CComPtr<IDWriteFontFamily> family;
-    CComPtr<IDWriteLocalizedStrings> names;
-    if (FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
-                                   reinterpret_cast<IUnknown**>(&factory))) ||
-        FAILED(factory->GetGdiInterop(&interop)) ||
-        FAILED(interop->CreateFontFromLOGFONT(&picked, &font)) ||
-        FAILED(font->GetFontFamily(&family)) || FAILED(family->GetFamilyNames(&names))) {
-        return gdi_name;
-    }
-    UINT32 index = 0;
-    BOOL exists = FALSE;
-    if (FAILED(names->FindLocaleName(L"en-us", &index, &exists)) || !exists) index = 0;
-    UINT32 length = 0;
-    if (FAILED(names->GetStringLength(index, &length)) || length == 0 || length >= LF_FACESIZE) {
-        return gdi_name;
-    }
-    std::wstring name(length + 1, L'\0');
-    if (FAILED(names->GetString(index, name.data(), length + 1))) return gdi_name;
-    name.resize(length);
-    // Only a name GDI can open too.
-    return gdi_has_family(name) ? name : gdi_name;
-}
-
-//! The family a family-only pick stands for: the family box's text, which is what the user
-//! clicked, else the DirectWrite grouping of whatever style the hidden style list held.
-[[nodiscard]] std::wstring fallback_family(const LOGFONTW& picked) {
-    if (!g_picked_family.empty() && gdi_has_family(g_picked_family)) return g_picked_family;
-    return base_family(picked);
-}
-
-//! Text fields get some room before the first character: the Edit control's own margin is a
-//! pixel or two with the dialog font, so the text sat against the border. 4 px at 96 DPI.
-void pad_text_fields(HWND dialog) {
-    HDC dc = GetDC(dialog);
-    const int dpi = dc != nullptr ? GetDeviceCaps(dc, LOGPIXELSY) : 96;
-    if (dc != nullptr) ReleaseDC(dialog, dc);
-    const int pad = MulDiv(4, dpi, 96);
-    EnumChildWindows(
-        dialog,
-        [](HWND child, LPARAM pad) -> BOOL {
-            wchar_t name[16]{};
-            GetClassNameW(child, name, 16);
-            if (_wcsicmp(name, L"Edit") == 0) {
-                SendMessageW(child, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN,
-                             MAKELPARAM(pad, pad));
-            }
-            return TRUE;
-        },
-        pad);
-}
-
-//! The Windows font dialog, started from what is already chosen. Returns false on Cancel.
-//! defaultTenths / defaultWeight are what an unset choice actually renders as.
-bool pickFont(HWND owner, FontSel& f, int defaultTenths, int defaultWeight, bool familyOnly) {
-    HDC screen = GetDC(nullptr);
-    const int dpi = screen ? GetDeviceCaps(screen, LOGPIXELSY) : 96;
-    if (screen) ReleaseDC(nullptr, screen);
-
-    LOGFONTW logical{};
-    logical.lfCharSet = DEFAULT_CHARSET;
-    logical.lfWeight = f.weight != 0 ? f.weight : defaultWeight;
-    logical.lfItalic = f.italic ? TRUE : FALSE;
-    logical.lfHeight = -MulDiv(f.tenthsPt != 0 ? f.tenthsPt : defaultTenths, dpi, 720);
-    // Unset means the user's UI font, so that is what the dialog should start on.
-    std::string family = f.family;
-    if (family.empty()) family = hostFontFamily();
-    if (family.empty()) family = "Segoe UI";
-    const pfc::stringcvt::string_wide_from_utf8 face(family.c_str());
-    wcsncpy_s(logical.lfFaceName, face.get_ptr(), _TRUNCATE);
-
-    CHOOSEFONTW dialog{};
-    dialog.lStructSize = sizeof dialog;
-    dialog.hwndOwner = owner;
-    dialog.lpLogFont = &logical;
-    dialog.Flags = CF_SCREENFONTS | CF_INITTOLOGFONTSTRUCT | CF_NOVERTFONTS;
-    // A fallback only lends its family: size and style come from the line's own font.
-    if (familyOnly) {
-        dialog.Flags |= CF_NOSIZESEL | CF_NOSTYLESEL | CF_ENABLEHOOK;
-        dialog.lpfnHook = &family_only_hook;
-    }
-    if (!ChooseFontW(&dialog) || logical.lfFaceName[0] == L'\0') return false;
-
-    const pfc::stringcvt::string_utf8_from_wide name(
-        familyOnly ? fallback_family(logical).c_str() : logical.lfFaceName);
-    f.family.assign(name.get_ptr(), name.length());
-    if (!familyOnly) {
-        f.tenthsPt = dialog.iPointSize > 0 ? dialog.iPointSize : 0;
-        f.weight = logical.lfWeight > 0 ? logical.lfWeight : FW_NORMAL;
-        f.italic = logical.lfItalic != 0;
-    }
-    return true;
+//! The Windows font dialog, started from what is already chosen (unset: the UI font at the
+//! layout's size and weight). Returns false on Cancel.
+bool pickFont(HWND owner, FontSel& f, int defaultTenths, int defaultWeight) {
+    return fbc::fonts::pick_font(owner, f,
+                                 {hostFontFamily(), static_cast<std::uint32_t>(defaultTenths),
+                                  static_cast<std::uint32_t>(defaultWeight)});
 }
 
 //! "Save preset": asks for a name. Save stays disabled while the name is empty or a built-in's.
@@ -542,17 +378,14 @@ private:
     // Returns true when id was a font Select/Default/Clear button (whether or not it changed anything).
     bool onFontButton(int id) {
         switch (id) {
-        case IDC_TITLE_FONT_PICK: pickFont(m_hWnd, m_title, Settings::kTitleDefaultTenthsPt, FW_BOLD, false); return true;
-        case IDC_DETAIL_FONT_PICK: pickFont(m_hWnd, m_detail, Settings::kDetailDefaultTenthsPt, FW_NORMAL, false); return true;
+        case IDC_TITLE_FONT_PICK: pickFont(m_hWnd, m_title, Settings::kTitleDefaultTenthsPt, FW_BOLD); return true;
+        case IDC_DETAIL_FONT_PICK: pickFont(m_hWnd, m_detail, Settings::kDetailDefaultTenthsPt, FW_NORMAL); return true;
         case IDC_TITLE_FONT_CLEAR: m_title = FontSel{std::string(), Settings::kTitleDefaultTenthsPt, 0, false}; return true;
         case IDC_DETAIL_FONT_CLEAR: m_detail = FontSel{std::string(), Settings::kDetailDefaultTenthsPt, 0, false}; return true;
         default: break;
         }
         if (id >= IDC_FALLBACK_PICK && id < IDC_FALLBACK_PICK + kFallbackCount) {
-            FontSel pick;
-            std::string& slot = m_fallback[id - IDC_FALLBACK_PICK];
-            pick.family = slot;
-            if (pickFont(m_hWnd, pick, Settings::kDetailDefaultTenthsPt, FW_NORMAL, true)) slot = pick.family;
+            (void)fbc::fonts::pick_family(m_hWnd, m_fallback[id - IDC_FALLBACK_PICK], hostFontFamily());
             return true;
         }
         if (id >= IDC_FALLBACK_CLEAR && id < IDC_FALLBACK_CLEAR + kFallbackCount) {
@@ -756,12 +589,12 @@ private:
         s.line2 = text(IDC_LINE2);
         s.line3 = text(IDC_LINE3);
         s.titleFont = m_title.family;
-        s.titlePt = m_title.tenthsPt;
-        s.titleWeight = m_title.weight;
+        s.titlePt = static_cast<int>(m_title.tenths_pt);
+        s.titleWeight = static_cast<int>(m_title.weight);
         s.titleItalic = m_title.italic;
         s.detailFont = m_detail.family;
-        s.detailPt = m_detail.tenthsPt;
-        s.detailWeight = m_detail.weight;
+        s.detailPt = static_cast<int>(m_detail.tenths_pt);
+        s.detailWeight = static_cast<int>(m_detail.weight);
         s.detailItalic = m_detail.italic;
         s.fallback1 = m_fallback[0];
         s.fallback2 = m_fallback[1];
@@ -819,8 +652,8 @@ private:
         setText(IDC_LINE1, s.line1);
         setText(IDC_LINE2, s.line2);
         setText(IDC_LINE3, s.line3);
-        m_title = FontSel{s.titleFont, s.titlePt, s.titleWeight, s.titleItalic};
-        m_detail = FontSel{s.detailFont, s.detailPt, s.detailWeight, s.detailItalic};
+        m_title = FontSel{s.titleFont, static_cast<std::uint32_t>(s.titlePt), static_cast<std::uint32_t>(s.titleWeight), s.titleItalic};
+        m_detail = FontSel{s.detailFont, static_cast<std::uint32_t>(s.detailPt), static_cast<std::uint32_t>(s.detailWeight), s.detailItalic};
         m_fallback[0] = s.fallback1;
         m_fallback[1] = s.fallback2;
         m_fallback[2] = s.fallback3;
