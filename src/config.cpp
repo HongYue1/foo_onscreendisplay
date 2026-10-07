@@ -99,6 +99,7 @@ void visit(Settings& s, V& v) {
     v("shadow", s.shadow);
     v("sheen", s.sheen);
     v("accentFromCover", s.accentFromCover);
+    v("coverGradient", s.coverGradient);
     v("accent", s.accent);
     v("animation", s.animation);
     v("animSpeed", s.animSpeed);
@@ -169,6 +170,7 @@ void Settings::copyLook(const Settings& d) {
     shadow = d.shadow;
     sheen = d.sheen;
     accentFromCover = d.accentFromCover;
+    coverGradient = d.coverGradient;
     accent = d.accent;
     animation = d.animation;
     animSpeed = d.animSpeed;

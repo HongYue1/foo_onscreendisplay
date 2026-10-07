@@ -599,6 +599,7 @@ private:
         const bool bar = checked(IDC_SHOW_PROGRESS);
         for (int id : {IDC_SHOW_KNOB, IDC_SHOW_TIMES, IDC_BAR_STYLE}) GetDlgItem(id).EnableWindow(bar);
         GetDlgItem(IDC_SHOW_REMAINING).EnableWindow(bar && checked(IDC_SHOW_TIMES));
+        GetDlgItem(IDC_COVER_GRADIENT).EnableWindow(bar && checked(IDC_ACCENT_COVER));
     }
 
     // ---- colour swatches ---------------------------------------------------------------------
@@ -749,6 +750,7 @@ private:
         s.sheen = checked(IDC_SHEEN);
         s.clearType = checked(IDC_CLEARTYPE);
         s.accentFromCover = checked(IDC_ACCENT_COVER);
+        s.coverGradient = checked(IDC_COVER_GRADIENT);
 
         s.line1 = text(IDC_LINE1);
         s.line2 = text(IDC_LINE2);
@@ -812,6 +814,7 @@ private:
         check(IDC_SHEEN, s.sheen);
         check(IDC_CLEARTYPE, s.clearType);
         check(IDC_ACCENT_COVER, s.accentFromCover);
+        check(IDC_COVER_GRADIENT, s.coverGradient);
 
         setText(IDC_LINE1, s.line1);
         setText(IDC_LINE2, s.line2);

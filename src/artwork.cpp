@@ -31,12 +31,16 @@ std::mutex g_tokenMutex; // start/stop can race between the prewarm thread and t
 // The result is the raw cover colour; colour::accent_for_background makes it legible on the card.
 void pickAccent(Artwork& art) {
     art.hasAccent = false;
+    art.hasSecondary = false;
     if (art.w <= 0 || art.h <= 0 || art.px.size() != static_cast<size_t>(art.w) * static_cast<size_t>(art.h)) return;
     const auto colours = fbc::cover_colours(reinterpret_cast<const std::uint8_t*>(art.px.data()),
                                             static_cast<std::uint32_t>(art.w), static_cast<std::uint32_t>(art.h));
     if (!colours) return;
     art.accent = colours->primary;
     art.hasAccent = true;
+    art.hasSecondary = colours->secondary.has_value();
+    art.secondary = colours->secondary.value_or(0u);
+    art.colourfulness = colours->colourfulness;
 }
 
 bool startGdiplus() {

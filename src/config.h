@@ -65,6 +65,8 @@ struct Settings {
     bool shadow = true;
     bool sheen = false;
     bool accentFromCover = true;
+    //! The progress bar runs from the cover's main colour to its second one (when it has one).
+    bool coverGradient = false;
     std::uint32_t accent = 0x4DA3FF;
     int animation = AnimSlide;
     int animSpeed = 100; // percent (40-300)

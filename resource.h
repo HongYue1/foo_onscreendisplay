@@ -77,6 +77,7 @@
 #define IDC_LINE3 1072
 #define IDC_TITLEFORMAT_HELP 1073
 #define IDC_TEXT_DEFAULT 1089
+#define IDC_COVER_GRADIENT 1090
 
 // Fonts. Each font row is a text control showing the choice plus Select and Default/Clear buttons.
 // The fallback ids run consecutively: text 1080-1082, Select 1083-1085, Clear 1086-1088.

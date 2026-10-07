@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "colour.h"
+#include "fbc/cover_accent.h"
 #include "osd_window.h"
 
 #pragma comment(lib, "gdiplus.lib")
@@ -434,21 +435,24 @@ void OsdWindow::resolveColors() {
     // The raw cover colour tints the card; the accent (bar, border) is made legible on that card.
     const bool fromCover = m_s.accentFromCover && m_c.art && m_c.art->hasAccent;
     c.accent = fromCover ? m_c.art->accent : m_s.accent;
+    // A nearly grey cover tints the card muddy grey-brown: the tint fades out with colourfulness
+    // and the card goes neutral.
+    const float tint = fromCover ? fbc::tint_weight(m_c.art->colourfulness) : 1.f;
     switch (m_s.bgMode) {
     case BgLight:
-        c.bg = mixRgb(0xF4F4F7, c.accent, 0.06f);
+        c.bg = mixRgb(0xF4F4F7, c.accent, 0.06f * tint);
         break;
     case BgCoverTint:
-        c.bg = mixRgb(0x15151A, c.accent, 0.30f);
+        c.bg = mixRgb(0x15151A, c.accent, 0.30f * tint);
         break;
     case BgCoverColour:
-        c.bg = mixRgb(c.accent, 0x000000, 0.18f);
+        c.bg = mixRgb(0x15151A, mixRgb(c.accent, 0x000000, 0.18f), tint);
         break;
     case BgCustom:
         c.bg = m_s.bgColor;
         break;
     default:
-        c.bg = mixRgb(0x15151A, c.accent, 0.08f);
+        c.bg = mixRgb(0x15151A, c.accent, 0.08f * tint);
         break;
     }
     c.lightBg = luminance(c.bg) > 0.58f;
@@ -458,6 +462,9 @@ void OsdWindow::resolveColors() {
     c.fg = m_s.bgMode == BgCoverColour ? c.text : c.accent;
     // A custom accent is the user's choice: only nudged when it would vanish into the card.
     if (m_s.bgMode != BgCoverColour) c.fg = colour::with_min_lc(c.fg, c.bg, colour::accent_min_lc_for(c.bg));
+    // Optional two-colour progress bar: the cover's second colour, made legible on the same card.
+    c.gradient = m_s.coverGradient && fromCover && m_c.art->hasSecondary && m_s.bgMode != BgCoverColour;
+    c.fg2 = c.gradient ? colour::accent_for_background(m_c.art->secondary, c.bg) : c.fg;
 }
 
 void OsdWindow::computeLayout() {
@@ -886,9 +893,22 @@ void OsdWindow::drawProgress(double pos) {
     if (fillW > 0.5f) {
         G::GraphicsPath fill;
         roundedPath(fill, G::RectF(l.barX, by, fillW < l.barH ? l.barH : fillW, l.barH), l.barH / 2.f);
-        G::LinearGradientBrush fb(G::RectF(l.barX, by, l.barW, l.barH), argb(255, mixRgb(m_col.fg, 0xFFFFFF, m_col.lightBg ? 0.f : 0.25f)),
-                                  argb(255, m_col.fg), G::LinearGradientModeHorizontal);
-        g.FillPath(&fb, &fill);
+        if (m_col.gradient) {
+            // The cover's two colours across the filled part, so both show at any position,
+            // blended in OKLab (three stops: GDI+ interpolates in sRGB, which dips muddy between
+            // two distant hues).
+            const float span = (fillW < l.barH ? l.barH : fillW) + 1.f;
+            G::LinearGradientBrush fb(G::RectF(l.barX - 0.5f, by, span, l.barH), argb(255, m_col.fg), argb(255, m_col.fg2),
+                                      G::LinearGradientModeHorizontal);
+            const G::Color stops[3] = {argb(255, m_col.fg), argb(255, colour::mix(m_col.fg, m_col.fg2, 0.5f)), argb(255, m_col.fg2)};
+            const G::REAL positions[3] = {0.f, 0.5f, 1.f};
+            fb.SetInterpolationColors(stops, positions, 3);
+            g.FillPath(&fb, &fill);
+        } else {
+            G::LinearGradientBrush fb(G::RectF(l.barX, by, l.barW, l.barH), argb(255, mixRgb(m_col.fg, 0xFFFFFF, m_col.lightBg ? 0.f : 0.25f)),
+                                      argb(255, m_col.fg), G::LinearGradientModeHorizontal);
+            g.FillPath(&fb, &fill);
+        }
         if (m_s.showKnob && m_s.barStyle != BarThin) {
             const float kr = (m_s.barStyle == BarThick ? 6.f : 4.5f) * s;
             G::SolidBrush knob(argb(255, m_col.lightBg ? m_col.fg : m_col.text));

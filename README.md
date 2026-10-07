@@ -76,7 +76,7 @@ resumed, and (if you turn it on) when you seek.
 | Tab | What is in it |
 | --- | --- |
 | General | When the card shows (track start, stream title, pause, seek); how long, keep visible while paused, wait for the cover, fade under the mouse pointer, only in the background, hide over full-screen apps; position (nine spots), monitor, margin, size (50-300%) |
-| Style | Preset (save your own, delete them); layout, background (dark, light, cover tint, cover colour, custom), opacity, border, corner radius; text colour, accent (or from the cover), animation and speed; shadow, glossy edge |
+| Style | Preset (save your own, delete them); layout, background (dark, light, cover tint, cover colour, custom), opacity, border, corner radius; text colour, accent (or from the cover), animation and speed; shadow, glossy edge, two-colour bar from the cover |
 | Elements | Album art, play/pause icon, progress bar with knob, time labels and time left; art shape and bar style |
 | Text | The three track lines. **Help** opens foobar2000's title formatting reference; **Default** restores the three lines only |
 | Fonts | Line 1 font, lines 2-3 font, sharper text (ClearType), and three fallback fonts |

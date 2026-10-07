@@ -37,6 +37,11 @@ struct Artwork {
     std::vector<std::uint32_t> px;
     bool hasAccent = false;
     std::uint32_t accent = 0; // 0xRRGGBB
+    //! A second, clearly different cover colour, if the cover has one (fbc::cover_colours).
+    bool hasSecondary = false;
+    std::uint32_t secondary = 0; // 0xRRGGBB
+    //! 0 (grey) .. 1 (vivid): how much the cover may tint the card.
+    float colourfulness = 1.f;
 };
 
 struct Content {
@@ -83,6 +88,9 @@ private:
         std::uint32_t bg = 0;
         std::uint32_t text = 0;
         std::uint32_t fg = 0;       // bar / glyph colour
+        //! The progress bar's far end with the two-colour gradient (else fg).
+        std::uint32_t fg2 = 0;
+        bool gradient = false;
         bool lightBg = false;
     };
 

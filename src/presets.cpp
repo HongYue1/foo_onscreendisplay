@@ -34,6 +34,7 @@ void base(Settings& s) {
     s.shadow = true;
     s.sheen = false;
     s.accentFromCover = true;
+    s.coverGradient = false;
     s.accent = 0x4DA3FF;
     s.animation = AnimSlide;
     s.animSpeed = 100;

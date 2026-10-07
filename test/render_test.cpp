@@ -431,10 +431,13 @@ int wmain(int argc, wchar_t** argv) {
                 Content c = latin;
                 c.line1 = std::wstring(cv.name, cv.name + std::strlen(cv.name));
                 c.art = a;
-                for (const char* look : {"Midnight", "Snow"}) {
+                for (const char* look : {"Midnight", "Snow", "Midnight+gradient"}) {
+                    const bool gradient = std::strcmp(look, "Midnight+gradient") == 0;
+                    if (gradient && !a->hasSecondary) continue;
                     Settings s;
-                    presets::apply(findPreset(look), s);
+                    presets::apply(findPreset(gradient ? "Midnight" : look), s);
                     s.accentFromCover = true;
+                    s.coverGradient = gradient;
                     s.layout = LayoutCompact;
                     Frame f;
                     const std::uint32_t* px = win.debugRender(s, c, 200.0, f.w, f.h);
@@ -442,7 +445,7 @@ int wmain(int argc, wchar_t** argv) {
                     cards.push_back(trim(f));
                 }
             }
-            grid(cards, 4, dir + L"\\accents.jpg", 60, 0.6f);
+            grid(cards, 3, dir + L"\\accents.jpg", 60, 0.6f);
         }
 
         // ---- all presets, trimmed, three to a row: presets.jpg ------------------------------
