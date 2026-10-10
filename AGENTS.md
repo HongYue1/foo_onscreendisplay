@@ -26,7 +26,9 @@ To try a build without packaging, copy `x64\Release\foo_onscreendisplay.dll` to
   `../.archive/foo_onscreendisplay-<version>-symbols.zip`, commit, tag `v<version>`, push, and
   `gh release create` with the .fb2k-component attached. Only when the user says so.
 - Cover colour and contrast (OKLab, APCA) live in `../fb2k-common`; change them there.
-- foobar2000 cannot be run from here: the user tests the DLL in their install.
+- Test in a foo_mcp instance (`../foobar2000-component-dev/references/testing-with-foo-mcp.md`):
+  `python ../foo_mcp/tools/fb.py install dui64 x64/Release/<dll>`, then drive it. Never claim
+  something works because it compiled; tooltips still need the user.
 - Upgrading from 1.2.0 or older: the component used to be `foo_osd`; the two must not be
   installed side by side (settings carry over).
 
