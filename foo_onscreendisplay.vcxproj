@@ -37,7 +37,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup Label="UserMacros">
     <!-- The SDK is a sibling folder, not a vendored copy. See README.md (Building). -->
-    <SdkRoot>..\SDK-2026-09-17</SdkRoot>
+    <SdkRoot>..\SDK-2026-10-01</SdkRoot>
     <SdkLibConfiguration Condition="'$(Configuration)'=='Release'">Release-Static</SdkLibConfiguration>
     <SdkLibConfiguration Condition="'$(Configuration)'=='Debug'">Debug</SdkLibConfiguration>
     <SdkLibSubDir Condition="'$(Platform)'=='x64'">x64\$(SdkLibConfiguration)</SdkLibSubDir>

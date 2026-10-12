@@ -17,7 +17,7 @@ if /I "%PLAT%"=="Win32" (
 )
 
 if exist build.log del build.log
-set SDK=..\SDK-2026-09-17
+set SDK=..\SDK-2026-10-01
 set MSB=msbuild /nologo /m /v:minimal /p:Platform=%PLAT%
 set LOG=/fileLogger "/flp:logfile=build.log;verbosity=normal;append"
 
